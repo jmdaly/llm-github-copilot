@@ -1,0 +1,22 @@
+[project]
+name = "llm-github-copilot"
+version = "0.1"
+description = "GitHub Copilot plugin for LLM CLI tool"
+readme = "README.md"
+authors = [{name = "John M Daly"}]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License"
+]
+dependencies = [
+    "llm",
+    "httpx"
+]
+requires-python = ">=3.7"
+
+[project.urls]
+Homepage = "https://github.com/jmdaly/llm-github-copilot"
+Issues = "https://github.com/jmdaly/llm-github-copilot/issues"
+
+[project.entry-points.llm]
+github_copilot = "llm_github_copilot"

@@ -10,7 +10,36 @@ from pydantic import Field, field_validator
 
 @llm.hookimpl
 def register_models(register):
+    # Register the main model
     register(GitHubCopilot())
+    
+    # Register all model variants
+    # Claude variants
+    claude_3_5_sonnet = GitHubCopilot()
+    claude_3_5_sonnet.model_id = "github-copilot/claude-3-5-sonnet"
+    register(claude_3_5_sonnet)
+    
+    claude_3_7_sonnet = GitHubCopilot()
+    claude_3_7_sonnet.model_id = "github-copilot/claude-3-7-sonnet"
+    register(claude_3_7_sonnet)
+    
+    claude_3_7_sonnet_thought = GitHubCopilot()
+    claude_3_7_sonnet_thought.model_id = "github-copilot/claude-3-7-sonnet-thought" 
+    register(claude_3_7_sonnet_thought)
+    
+    # OpenAI models
+    o1_model = GitHubCopilot()
+    o1_model.model_id = "github-copilot/o1"
+    register(o1_model)
+    
+    o3_mini = GitHubCopilot()
+    o3_mini.model_id = "github-copilot/o3-mini" 
+    register(o3_mini)
+    
+    # Google models
+    gemini = GitHubCopilot()
+    gemini.model_id = "github-copilot/gemini-2.0-flash-001"
+    register(gemini)
 
 
 class GitHubCopilotAuthenticator:
@@ -227,6 +256,11 @@ class GitHubCopilot(llm.Model):
     # Map of model names to API model identifiers
     MODEL_MAPPINGS = {
         "github-copilot": "gpt-4o",
+        "github-copilot/o1": "o1",
+        "github-copilot/o3-mini": "o3-mini",
+        "github-copilot/gemini-2.0-flash-001 ": "gemini-2.0-flash-001",
+        "github-copilot/claude-3-5-sonnet": "claude-3-5-sonnet",
+        "github-copilot/claude-3-7-sonnet": "claude-3-7-sonnet",
         "github-copilot/claude-3-7-sonnet-thought": "claude-3-7-sonnet-thought",
     }
     
@@ -261,7 +295,7 @@ class GitHubCopilot(llm.Model):
         
     def __init__(self):
         self.authenticator = GitHubCopilotAuthenticator()
-        # GitHub Copilot API base URL - alternative URL format
+        # GitHub Copilot API base URL
         self.api_base = "https://api.githubcopilot.com"
         
     def _get_model_for_api(self, model: str) -> str:
@@ -288,6 +322,8 @@ class GitHubCopilot(llm.Model):
         
         # Get model name
         model_name = self._get_model_for_api(self.model_id)
+        # For debugging
+        print(f"Using model ID: {self.model_id}, API model name: {model_name}")
         
         # Prepare the request with required headers
         headers = {
@@ -299,11 +335,6 @@ class GitHubCopilot(llm.Model):
             "user-agent": "GithubCopilot/1.155.0",
             "Copilot-Integration-Id": "vscode-chat",  # Use a recognized integration ID
         }
-        
-        # Print debugging information about the API key
-        print(f"Debug: API key starts with {api_key[:4]}...")
-        print(f"Debug: API key length: {len(api_key)}")
-        print(f"Debug: Using auth header: Bearer {api_key[:4]}...")
         
         # Extract messages from conversation
         messages = []
@@ -370,92 +401,81 @@ class GitHubCopilot(llm.Model):
         }
         
         client = httpx.Client()
-        print(f"Debug: Using API endpoint {self.api_base}/chat/completions")
-        print(f"Debug: Using model {model_name}")
         
-        # Make a simple diagnostic request first
-        try:
-            diagnostic_response = client.post(
-                f"{self.api_base}/chat/completions",
-                headers=headers,
-                json={**payload, "stream": False},  # Force non-streaming for diagnostics
-                timeout=120
-            )
-            print(f"Debug: Diagnostic response status: {diagnostic_response.status_code}")
-            print(f"Debug: Diagnostic content type: {diagnostic_response.headers.get('content-type', 'none')}")
-            print(f"Debug: Diagnostic response length: {len(diagnostic_response.content)}")
-            
+        # Handle the request and response based on streaming or non-streaming mode
+        if not stream:
             try:
-                text_content = diagnostic_response.text
-                if text_content:
-                    print(f"Debug: Response text: {text_content[:100]}...")
-                    yield text_content
-                    return  # We got a response, return it
-            except Exception as text_err:
-                print(f"Debug: Couldn't access text: {str(text_err)}")
-        
-        except Exception as diag_err:
-            print(f"Debug: Diagnostic request failed: {str(diag_err)}")
-            # Continue to try the streaming request
-        
-        # Try the streaming request
-        try:
-            with client.stream(
-                "POST",
-                f"{self.api_base}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=120
-            ) as stream_response:
-                print(f"Debug: Stream response status: {stream_response.status_code}")
+                api_response = client.post(
+                    f"{self.api_base}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=120
+                )
+                api_response.raise_for_status()
                 
-                # Process the streaming response
-                for line in stream_response.iter_lines():
-                    if not line:
-                        continue
+                # Parse the JSON response
+                json_data = api_response.json()
+                
+                # Extract the message content
+                if "choices" in json_data and json_data["choices"]:
+                    message = json_data["choices"][0].get("message", {})
+                    content = message.get("content", "")
                     
-                    # Debug the line
-                    line_str = line.decode('utf-8') if isinstance(line, bytes) else line
-                    print(f"Debug: Stream line: {line_str[:50]}...")
+                    # Update usage statistics in response_json if available
+                    if "usage" in json_data:
+                        response.response_json["usage"] = json_data["usage"]
                     
-                    # Parse SSE format
-                    if line_str.startswith("data: "):
-                        data = line_str[6:]
-                        if data == "[DONE]":
-                            break
+                    # Return the content
+                    yield content
+                else:
+                    yield "No content found in the response"
+                    
+            except Exception as e:
+                yield f"Error with GitHub Copilot request: {str(e)}"
+                return
+        else:
+            # Handle streaming response
+            try:
+                with client.stream(
+                    "POST",
+                    f"{self.api_base}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=120
+                ) as stream_response:
+                    stream_response.raise_for_status()
+                    
+                    for line in stream_response.iter_lines():
+                        if not line:
+                            continue
                         
-                        try:
-                            # Try to parse as JSON
-                            json_data = json.loads(data)
-                            content = None
-                            if "choices" in json_data and json_data["choices"]:
-                                delta = json_data["choices"][0].get("delta", {})
-                                content = delta.get("content")
+                        line_str = line.decode('utf-8') if isinstance(line, bytes) else line
+                        
+                        # Parse SSE format
+                        if line_str.startswith("data: "):
+                            data = line_str[6:]
+                            if data == "[DONE]":
+                                break
                             
-                            if content:
-                                yield content
-                        except json.JSONDecodeError:
-                            # Not JSON, yield raw
-                            yield data
-                    else:
-                        # Not SSE format, yield as is
-                        yield line_str
-        
-        except httpx.HTTPStatusError as e:
-            try:
-                error_detail = e.response.text if hasattr(e, 'response') and e.response else "No response text available"
-                status_code = e.response.status_code if hasattr(e, 'response') and e.response else "unknown"
-                error_message = f"HTTP error: {str(e)}\nStatus code: {status_code}\nDetails: {error_detail}"
-                print(f"Debug: HTTP error - Status: {status_code}")
-                print(f"Debug: HTTP error - Response: {error_detail}")
-            except Exception as inner_e:
-                error_message = f"HTTP error: {str(e)}\nCould not get details: {str(inner_e)}"
-                print(f"Debug: Failed to extract error details: {str(inner_e)}")
-            yield error_message
-            return
-                
-        except Exception as e:
-            error_message = f"Error with GitHub Copilot request: {str(e)}"
-            print(f"Debug: General exception: {type(e).__name__}")
-            print(f"Debug: {error_message}")
-            yield error_message
+                            try:
+                                # Parse the JSON data
+                                json_data = json.loads(data)
+                                
+                                # Extract the content delta
+                                if "choices" in json_data and json_data["choices"]:
+                                    delta = json_data["choices"][0].get("delta", {})
+                                    content = delta.get("content")
+                                    
+                                    if content:
+                                        yield content
+                            except json.JSONDecodeError:
+                                continue
+            
+            except httpx.HTTPStatusError as e:
+                error_detail = e.response.text if hasattr(e, 'response') and e.response else "No response details"
+                yield f"HTTP error: {str(e)} - {error_detail}"
+                return
+                    
+            except Exception as e:
+                yield f"Error with GitHub Copilot streaming request: {str(e)}"
+                return

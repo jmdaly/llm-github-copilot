@@ -258,11 +258,18 @@ class GitHubCopilot(llm.Model):
         "github-copilot": "gpt-4o",
         "github-copilot/o1": "o1",
         "github-copilot/o3-mini": "o3-mini",
-        "github-copilot/gemini-2.0-flash-001 ": "gemini-2.0-flash-001",
-        "github-copilot/claude-3-5-sonnet": "claude-3-5-sonnet",
-        "github-copilot/claude-3-7-sonnet": "claude-3-7-sonnet",
-        "github-copilot/claude-3-7-sonnet-thought": "claude-3-7-sonnet-thought",
+        "github-copilot/gemini-2.0-flash-001": "gemini-2.0-flash-001",
+        "github-copilot/claude-3-5-sonnet": "claude-3.5-sonnet",  # Note: Fixed to use correct format with dot
+        "github-copilot/claude-3-7-sonnet": "claude-3.7-sonnet",  # Note: Fixed to use correct format with dot
+        "github-copilot/claude-3-7-sonnet-thought": "claude-3.7-sonnet-thought",  # Note: Fixed to use correct format with dot
     }
+    
+    # Identify models that need special handling for streaming
+    CLAUDE_MODELS = [
+        "claude-3.5-sonnet",
+        "claude-3.7-sonnet", 
+        "claude-3.7-sonnet-thought",
+    ]
     
     class Options(llm.Options):
         """
@@ -308,6 +315,10 @@ class GitHubCopilot(llm.Model):
         
         # Use the mapping or default to gpt-4o
         return self.MODEL_MAPPINGS.get(model, "gpt-4o")
+    
+    def _is_claude_model(self, model_name: str) -> bool:
+        """Check if model is a Claude model that needs special handling."""
+        return model_name in self.CLAUDE_MODELS
         
     def execute(self, prompt, stream, response, conversation):
         """
@@ -381,7 +392,7 @@ class GitHubCopilot(llm.Model):
         max_tokens = prompt.options.max_tokens or 1024
         temperature = prompt.options.temperature or 0.7
         
-        # Prepare payload
+        # Prepare payload - based on litellm, we'll use a simpler approach
         payload = {
             "model": model_name,
             "messages": messages,
@@ -393,18 +404,20 @@ class GitHubCopilot(llm.Model):
         # Record additional information in response_json
         response.response_json = {
             "model": model_name,
+            "messages": messages,
             "usage": {
-                "prompt_tokens": 0,  # Will be updated in non-streaming responses
-                "completion_tokens": 0,  # Will be updated in non-streaming responses
-                "total_tokens": 0  # Will be updated in non-streaming responses
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
             }
         }
         
         client = httpx.Client()
         
-        # Handle the request and response based on streaming or non-streaming mode
+        # Try non-streaming first for all models
         if not stream:
             try:
+                print(f"Sending non-streaming request to {self.api_base}/chat/completions with model {model_name}")
                 api_response = client.post(
                     f"{self.api_base}/chat/completions",
                     headers=headers,
@@ -413,29 +426,59 @@ class GitHubCopilot(llm.Model):
                 )
                 api_response.raise_for_status()
                 
-                # Parse the JSON response
-                json_data = api_response.json()
+                print(f"Response status: {api_response.status_code}")
+                print(f"Response content type: {api_response.headers.get('content-type', 'none')}")
                 
-                # Extract the message content
-                if "choices" in json_data and json_data["choices"]:
-                    message = json_data["choices"][0].get("message", {})
-                    content = message.get("content", "")
+                try:
+                    # Parse the JSON response
+                    json_data = api_response.json()
+                    print(f"Response JSON keys: {list(json_data.keys())}")
                     
-                    # Update usage statistics in response_json if available
-                    if "usage" in json_data:
-                        response.response_json["usage"] = json_data["usage"]
+                    # Extract the message content
+                    if "choices" in json_data and json_data["choices"]:
+                        choice = json_data["choices"][0]
+                        print(f"Choice keys: {list(choice.keys())}")
+                        
+                        content = None
+                        if "message" in choice:
+                            message = choice["message"]
+                            print(f"Message keys: {list(message.keys())}")
+                            content = message.get("content", "")
+                        
+                        # Update usage statistics in response_json if available
+                        if "usage" in json_data:
+                            response.response_json["usage"] = json_data["usage"]
+                        
+                        if content:
+                            yield content
+                        else:
+                            print("No content found in structured response")
+                            yield "No content found in the response"
+                    else:
+                        print("No choices found in response")
+                        yield "No content found in the response"
+                        
+                except json.JSONDecodeError:
+                    # If response is not JSON, return the raw text
+                    print("Response is not valid JSON")
+                    raw_text = api_response.text
+                    print(f"Raw text (first 100 chars): {raw_text[:100]}")
+                    yield raw_text
                     
-                    # Return the content
-                    yield content
-                else:
-                    yield "No content found in the response"
-                    
+            except httpx.HTTPStatusError as e:
+                print(f"HTTP error: {e}")
+                error_detail = e.response.text if hasattr(e, 'response') and e.response else "No response details"
+                yield f"HTTP error: {str(e)} - {error_detail}"
+                return
+                
             except Exception as e:
+                print(f"Exception during request: {e}")
                 yield f"Error with GitHub Copilot request: {str(e)}"
                 return
         else:
-            # Handle streaming response
+            # Handle streaming
             try:
+                print(f"Sending streaming request to {self.api_base}/chat/completions with model {model_name}")
                 with client.stream(
                     "POST",
                     f"{self.api_base}/chat/completions",
@@ -443,39 +486,213 @@ class GitHubCopilot(llm.Model):
                     json=payload,
                     timeout=120
                 ) as stream_response:
+                    print(f"Stream response status: {stream_response.status_code}")
                     stream_response.raise_for_status()
                     
-                    for line in stream_response.iter_lines():
-                        if not line:
-                            continue
-                        
-                        line_str = line.decode('utf-8') if isinstance(line, bytes) else line
-                        
-                        # Parse SSE format
-                        if line_str.startswith("data: "):
-                            data = line_str[6:]
-                            if data == "[DONE]":
-                                break
+                    # For debugging purposes, collect some of the initial response
+                    debug_chunks = []
+                    
+                    try:
+                        # Read the raw content to debug
+                        for i, chunk in enumerate(stream_response.iter_raw()):
+                            if i < 5:  # Just collect the first few chunks for debugging
+                                debug_chunks.append(chunk)
+                                print(f"Raw chunk {i}: {chunk[:50]}")
                             
                             try:
-                                # Parse the JSON data
-                                json_data = json.loads(data)
+                                # Try to decode as text
+                                chunk_str = chunk.decode('utf-8')
                                 
-                                # Extract the content delta
-                                if "choices" in json_data and json_data["choices"]:
-                                    delta = json_data["choices"][0].get("delta", {})
-                                    content = delta.get("content")
-                                    
-                                    if content:
-                                        yield content
-                            except json.JSONDecodeError:
-                                continue
-            
+                                # Check for SSE format
+                                for line in chunk_str.splitlines():
+                                    if line.startswith("data: "):
+                                        data = line[6:]
+                                        if data == "[DONE]":
+                                            continue
+                                        
+                                        try:
+                                            json_data = json.loads(data)
+                                            if "choices" in json_data and json_data["choices"]:
+                                                delta = json_data["choices"][0].get("delta", {})
+                                                content = delta.get("content", "")
+                                                if content:
+                                                    yield content
+                                        except json.JSONDecodeError:
+                                            if data and data != "[DONE]":
+                                                yield data
+                                    elif line.strip():  # If not SSE but has content
+                                        yield line
+                            except UnicodeDecodeError:
+                                # Not utf-8 decodable, skip
+                                pass
+                    except Exception as chunk_error:
+                        print(f"Error processing stream chunks: {chunk_error}")
+                        
+                        # If we have debug chunks, log them
+                        if debug_chunks:
+                            print(f"Debug chunks collected: {len(debug_chunks)}")
+                            for i, chunk in enumerate(debug_chunks):
+                                print(f"Debug chunk {i}: {chunk}")
+                        
+                        # Try one more time with a fallback approach
+                        try:
+                            # Reset the stream
+                            print("Trying fallback approach for streaming...")
+                            
+                            # Don't use streaming for the fallback
+                            fallback_payload = dict(payload)
+                            fallback_payload["stream"] = False
+                            
+                            fallback_response = client.post(
+                                f"{self.api_base}/chat/completions",
+                                headers=headers,
+                                json=fallback_payload,
+                                timeout=120
+                            )
+                            
+                            if fallback_response.status_code == 200:
+                                try:
+                                    json_data = fallback_response.json()
+                                    if "choices" in json_data and json_data["choices"]:
+                                        message = json_data["choices"][0].get("message", {})
+                                        content = message.get("content", "")
+                                        
+                                        if content:
+                                            yield content
+                                        else:
+                                            yield "No content found in fallback response"
+                                except:
+                                    yield fallback_response.text
+                            else:
+                                yield f"Fallback request failed with status {fallback_response.status_code}"
+                        except Exception as fallback_error:
+                            yield f"Fallback also failed: {str(fallback_error)}"
+                            
             except httpx.HTTPStatusError as e:
+                print(f"HTTP error during streaming: {e}")
                 error_detail = e.response.text if hasattr(e, 'response') and e.response else "No response details"
-                yield f"HTTP error: {str(e)} - {error_detail}"
+                yield f"HTTP error during streaming: {str(e)} - {error_detail}"
                 return
-                    
+                
             except Exception as e:
+                print(f"Exception during streaming: {e}")
                 yield f"Error with GitHub Copilot streaming request: {str(e)}"
                 return
+
+    def _execute_claude_model(self, prompt, stream, response, headers, payload):
+        """
+        Special handling for Claude model completion requests.
+        """
+        client = httpx.Client()
+        
+        # For Claude models, always use non-streaming requests for now
+        try:
+            print("Sending request to Claude model...")
+            api_response = client.post(
+                f"{self.api_base}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=180  # Claude may take longer
+            )
+            
+            # Print debugging information
+            print(f"Claude response status: {api_response.status_code}")
+            print(f"Claude response content-type: {api_response.headers.get('content-type', 'none')}")
+            
+            # Check if the request was successful
+            if api_response.status_code != 200:
+                print(f"Error response from Claude API: {api_response.text}")
+                yield f"Error from Claude model: HTTP {api_response.status_code} - {api_response.text}"
+                return
+                
+            # Debug: Log the raw response
+            raw_response = api_response.text
+            print(f"Raw Claude response (first 200 chars): {raw_response[:200]}...")
+            
+            # Parse the JSON response
+            try:
+                json_data = api_response.json()
+                print(f"Claude response JSON keys: {json_data.keys()}")
+                
+                # Extract the message content
+                if "choices" in json_data and json_data["choices"]:
+                    print(f"Found choices in response: {len(json_data['choices'])}")
+                    choice = json_data["choices"][0]
+                    print(f"First choice keys: {choice.keys()}")
+                    
+                    # Check for message or content directly
+                    content = None
+                    if "message" in choice:
+                        message = choice["message"]
+                        print(f"Message keys: {message.keys()}")
+                        content = message.get("content", "")
+                    elif "content" in choice:
+                        content = choice.get("content", "")
+                    else:
+                        # Try other potential keys where content might be found
+                        for key in choice.keys():
+                            if isinstance(choice[key], dict) and "content" in choice[key]:
+                                content = choice[key]["content"]
+                                break
+                            elif isinstance(choice[key], str) and len(choice[key]) > 10:
+                                content = choice[key]
+                                break
+                    
+                    # If no content found through standard paths, check the entire response
+                    if not content:
+                        print("Searching for content in response...")
+                        # Try to find anything that looks like content
+                        if isinstance(json_data, dict):
+                            for key, value in json_data.items():
+                                if key == "content" and isinstance(value, str):
+                                    content = value
+                                    break
+                                elif isinstance(value, dict) and "content" in value and isinstance(value["content"], str):
+                                    content = value["content"]
+                                    break
+                    
+                    # Update usage statistics in response_json if available
+                    if "usage" in json_data:
+                        response.response_json["usage"] = json_data["usage"]
+                    
+                    if content:
+                        print(f"Found content (length: {len(content)})")
+                        # If streaming is requested, simulate streaming by yielding chunks
+                        if stream:
+                            # Simple chunking by sentences or paragraphs
+                            import re
+                            chunks = re.split(r'(?<=[.!?])\s+', content)
+                            for chunk in chunks:
+                                if chunk.strip():
+                                    yield chunk + " "
+                                    time.sleep(0.02)  # Small delay to simulate streaming
+                        else:
+                            # Return the full content at once
+                            yield content
+                    else:
+                        print("No content found in structured JSON response")
+                        # As a fallback, return the raw response if it looks like text
+                        if raw_response and len(raw_response) > 10 and not raw_response.startswith('{'):
+                            yield raw_response
+                        else:
+                            yield "No content found in the Claude model response"
+                else:
+                    print("No choices found in response")
+                    # Try to extract content from elsewhere in the response
+                    if "content" in json_data:
+                        yield json_data["content"]
+                    else:
+                        yield f"No structured content found. Raw response: {raw_response[:500]}"
+                    
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {str(e)}")
+                # If we can't parse JSON, return the raw response
+                if raw_response and len(raw_response) > 10 and not raw_response.startswith('{'):
+                    yield raw_response
+                else:
+                    yield f"Couldn't parse Claude response as JSON. Raw response: {raw_response[:500]}..."
+                    
+        except Exception as e:
+            print(f"Exception handling Claude request: {str(e)}")
+            yield f"Error with Claude model request: {str(e)}"
+            return

@@ -3,9 +3,8 @@ import os
 import json
 import time
 import httpx
-import re
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Generator
+from typing import Optional, Dict, Any
 from pydantic import Field, field_validator
 
 
@@ -13,30 +12,30 @@ from pydantic import Field, field_validator
 def register_models(register):
     # Register the main model
     register(GitHubCopilot())
-    
+
     # Register all model variants
     # Claude variants
     claude_3_5_sonnet = GitHubCopilot()
     claude_3_5_sonnet.model_id = "github-copilot/claude-3-5-sonnet"
     register(claude_3_5_sonnet)
-    
+
     claude_3_7_sonnet = GitHubCopilot()
     claude_3_7_sonnet.model_id = "github-copilot/claude-3-7-sonnet"
     register(claude_3_7_sonnet)
-    
+
     claude_3_7_sonnet_thought = GitHubCopilot()
-    claude_3_7_sonnet_thought.model_id = "github-copilot/claude-3-7-sonnet-thought" 
+    claude_3_7_sonnet_thought.model_id = "github-copilot/claude-3-7-sonnet-thought"
     register(claude_3_7_sonnet_thought)
-    
+
     # OpenAI models
     o1_model = GitHubCopilot()
     o1_model.model_id = "github-copilot/o1"
     register(o1_model)
-    
+
     o3_mini = GitHubCopilot()
-    o3_mini.model_id = "github-copilot/o3-mini" 
+    o3_mini.model_id = "github-copilot/o3-mini"
     register(o3_mini)
-    
+
     # Google models
     gemini = GitHubCopilot()
     gemini.model_id = "github-copilot/gemini-2.0-flash-001"
@@ -47,25 +46,25 @@ class GitHubCopilotAuthenticator:
     """
     Handles authentication with GitHub Copilot using device code flow.
     """
+
     def __init__(self) -> None:
         # Constants for GitHub API
         self.github_client_id = "Iv1.b507a08c87ecfe98"  # GitHub Copilot client ID
         self.github_device_code_url = "https://github.com/login/device/code"
         self.github_access_token_url = "https://github.com/login/oauth/access_token"
         self.github_api_key_url = "https://api.github.com/copilot_internal/v2/token"
-        
+
         # Token storage paths
         self.token_dir = os.getenv(
             "GITHUB_COPILOT_TOKEN_DIR",
-            os.path.expanduser("~/.config/llm/github_copilot")
+            os.path.expanduser("~/.config/llm/github_copilot"),
         )
         self.access_token_file = os.path.join(
             self.token_dir,
-            os.getenv("GITHUB_COPILOT_ACCESS_TOKEN_FILE", "access-token")
+            os.getenv("GITHUB_COPILOT_ACCESS_TOKEN_FILE", "access-token"),
         )
         self.api_key_file = os.path.join(
-            self.token_dir, 
-            os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
+            self.token_dir, os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
         )
         self._ensure_token_dir()
 
@@ -83,13 +82,13 @@ class GitHubCopilotAuthenticator:
             "user-agent": "GithubCopilot/1.155.0",
             "accept-encoding": "gzip,deflate,br",
         }
-        
+
         if access_token:
             headers["authorization"] = f"token {access_token}"
-            
+
         if "content-type" not in headers:
             headers["content-type"] = "application/json"
-            
+
         return headers
 
     def get_access_token(self) -> str:
@@ -159,7 +158,7 @@ class GitHubCopilotAuthenticator:
             required_fields = ["device_code", "user_code", "verification_uri"]
             if not all(field in resp_json for field in required_fields):
                 raise Exception("Response missing required fields")
-                
+
             return resp_json
         except Exception as e:
             raise Exception(f"Failed to get device code: {str(e)}")
@@ -170,7 +169,7 @@ class GitHubCopilotAuthenticator:
         """
         client = httpx.Client()
         max_attempts = 12  # 1 minute (12 * 5 seconds)
-        
+
         for attempt in range(max_attempts):
             try:
                 resp = client.post(
@@ -188,15 +187,20 @@ class GitHubCopilotAuthenticator:
                 if "access_token" in resp_json:
                     print("Authentication successful!")
                     return resp_json["access_token"]
-                elif "error" in resp_json and resp_json.get("error") == "authorization_pending":
-                    print(f"Waiting for authorization... (attempt {attempt+1}/{max_attempts})")
+                elif (
+                    "error" in resp_json
+                    and resp_json.get("error") == "authorization_pending"
+                ):
+                    print(
+                        f"Waiting for authorization... (attempt {attempt + 1}/{max_attempts})"
+                    )
                 else:
                     print(f"Unexpected response: {resp_json}")
             except Exception as e:
                 raise Exception(f"Failed to get access token: {str(e)}")
-                
+
             time.sleep(5)
-            
+
         raise Exception("Timed out waiting for user to authorize the device")
 
     def _login(self) -> str:
@@ -204,7 +208,7 @@ class GitHubCopilotAuthenticator:
         Login to GitHub Copilot using device code flow.
         """
         device_code_info = self._get_device_code()
-        
+
         device_code = device_code_info["device_code"]
         user_code = device_code_info["user_code"]
         verification_uri = device_code_info["verification_uri"]
@@ -212,7 +216,7 @@ class GitHubCopilotAuthenticator:
         print(
             f"\nPlease visit {verification_uri} and enter code {user_code} to authenticate GitHub Copilot.\n"
         )
-        
+
         return self._poll_for_access_token(device_code)
 
     def _refresh_api_key(self) -> Dict[str, Any]:
@@ -226,10 +230,7 @@ class GitHubCopilotAuthenticator:
         for attempt in range(max_retries):
             try:
                 client = httpx.Client()
-                response = client.get(
-                    self.github_api_key_url, 
-                    headers=headers
-                )
+                response = client.get(self.github_api_key_url, headers=headers)
                 response.raise_for_status()
 
                 response_json = response.json()
@@ -239,7 +240,9 @@ class GitHubCopilotAuthenticator:
                 else:
                     print(f"API key response missing token: {response_json}")
             except Exception as e:
-                print(f"Error refreshing API key (attempt {attempt+1}/{max_retries}): {str(e)}")
+                print(
+                    f"Error refreshing API key (attempt {attempt + 1}/{max_retries}): {str(e)}"
+                )
 
             if attempt < max_retries - 1:
                 time.sleep(1)
@@ -251,9 +254,10 @@ class GitHubCopilot(llm.Model):
     """
     GitHub Copilot model implementation for LLM.
     """
+
     model_id = "github-copilot"
     can_stream = True
-    
+
     # Map of model names to API model identifiers
     MODEL_MAPPINGS = {
         "github-copilot": "gpt-4o",
@@ -264,20 +268,30 @@ class GitHubCopilot(llm.Model):
         "github-copilot/claude-3-7-sonnet": "claude-3.7-sonnet",
         "github-copilot/claude-3-7-sonnet-thought": "claude-3.7-sonnet-thought",
     }
-    
+
+    # Models that support streaming
+    STREAMING_MODELS = [
+        "gpt-4o",
+        "o1",
+        "o3-mini",
+        "gemini-2.0-flash-001",
+        "claude-3.5-sonnet",
+        "claude-3.7-sonnet",
+        "claude-3.7-sonnet-thought",
+    ]
+
     class Options(llm.Options):
         """
         Options for the GitHub Copilot model.
         """
+
         max_tokens: Optional[int] = Field(
-            description="Maximum number of tokens to generate",
-            default=1024
+            description="Maximum number of tokens to generate", default=1024
         )
         temperature: Optional[float] = Field(
-            description="Controls randomness in the output",
-            default=0.7
+            description="Controls randomness in the output", default=0.7
         )
-        
+
         @field_validator("max_tokens")
         def validate_max_tokens(cls, max_tokens):
             if max_tokens is None:
@@ -285,7 +299,7 @@ class GitHubCopilot(llm.Model):
             if max_tokens < 1:
                 raise ValueError("max_tokens must be >= 1")
             return max_tokens
-            
+
         @field_validator("temperature")
         def validate_temperature(cls, temperature):
             if temperature is None:
@@ -293,23 +307,54 @@ class GitHubCopilot(llm.Model):
             if not 0 <= temperature <= 1:
                 raise ValueError("temperature must be between 0 and 1")
             return temperature
-        
+
     def __init__(self):
         self.authenticator = GitHubCopilotAuthenticator()
         # GitHub Copilot API base URL
         self.api_base = "https://api.githubcopilot.com"
-        
+
     def _get_model_for_api(self, model: str) -> str:
         """Convert model name to API-compatible format."""
         # Strip provider prefix if present
-        if '/' in model:
-            _, model_name = model.split('/', 1)
+        if "/" in model:
+            _, model_name = model.split("/", 1)
             if model_name in self.MODEL_MAPPINGS.values():
                 return model_name
-        
+
         # Use the mapping or default to gpt-4o
         return self.MODEL_MAPPINGS.get(model, "gpt-4o")
-        
+
+    def _non_streaming_request(self, prompt, headers, payload, model_name):
+        """Handle non-streaming requests."""
+        try:
+            print(f"Using non-streaming request for {model_name}")
+            api_response = httpx.post(
+                f"{self.api_base}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=180,  # longer timeout for non-streaming
+            )
+            api_response.raise_for_status()
+
+            # Try to parse JSON
+            try:
+                json_data = api_response.json()
+                if "choices" in json_data and json_data["choices"]:
+                    choice = json_data["choices"][0]
+                    if "message" in choice:
+                        content = choice["message"].get("content", "")
+                        if content:
+                            yield content
+                            return
+            except json.JSONDecodeError:
+                pass
+
+            # If JSON parsing fails, return raw text
+            yield api_response.text
+
+        except Exception as e:
+            yield f"Error with request: {str(e)}"
+
     def execute(self, prompt, stream, response, conversation):
         """
         Execute the GitHub Copilot completion.
@@ -320,12 +365,12 @@ class GitHubCopilot(llm.Model):
         except Exception as e:
             yield f"Error getting GitHub Copilot API key: {str(e)}"
             return
-        
+
         # Get model name
         model_name = self._get_model_for_api(self.model_id)
         # For debugging
         print(f"Using model ID: {self.model_id}, API model name: {model_name}")
-        
+
         # Prepare the request with required headers
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -336,153 +381,123 @@ class GitHubCopilot(llm.Model):
             "user-agent": "GithubCopilot/1.155.0",
             "Copilot-Integration-Id": "vscode-chat",  # Use a recognized integration ID
         }
-        
+
         # Extract messages from conversation
         messages = []
         if conversation and conversation.responses:
             for prev_response in conversation.responses:
                 # Add user message
-                messages.append({
-                    "role": "user",
-                    "content": prev_response.prompt.prompt
-                })
+                messages.append(
+                    {"role": "user", "content": prev_response.prompt.prompt}
+                )
                 # Add assistant message
-                messages.append({
-                    "role": "assistant",
-                    "content": prev_response.text()
-                })
-                
+                messages.append({"role": "assistant", "content": prev_response.text()})
+
         # Add the current prompt
         if messages:
             # Add system message if not present
             if not any(msg.get("role") == "system" for msg in messages):
-                messages.insert(0, {
-                    "role": "system",
-                    "content": "You are GitHub Copilot, an AI programming assistant."
-                })
+                messages.insert(
+                    0,
+                    {
+                        "role": "system",
+                        "content": "You are GitHub Copilot, an AI programming assistant.",
+                    },
+                )
             # Add the current prompt
-            messages.append({
-                "role": "user",
-                "content": prompt.prompt
-            })
+            messages.append({"role": "user", "content": prompt.prompt})
         else:
             # First message in conversation
             messages = [
                 {
                     "role": "system",
-                    "content": "You are GitHub Copilot, an AI programming assistant."
+                    "content": "You are GitHub Copilot, an AI programming assistant.",
                 },
-                {
-                    "role": "user",
-                    "content": prompt.prompt
-                }
+                {"role": "user", "content": prompt.prompt},
             ]
-            
+
         # Get options
         max_tokens = prompt.options.max_tokens or 1024
         temperature = prompt.options.temperature or 0.7
-        
+
         # Prepare payload
         payload = {
             "model": model_name,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "stream": False,  # Always use non-streaming first for reliability
+            "stream": model_name
+            in self.STREAMING_MODELS,  # Set streaming based on model support
         }
-        
-        # For O3-mini and similar models that don't handle streaming well
-        if "o3-mini" in model_name or "o1" in model_name or "claude" in model_name:
+
+        # Check if model supports streaming
+        supports_streaming = model_name in self.STREAMING_MODELS
+
+        # Always try streaming for supported models
+        if supports_streaming:
+            payload["stream"] = True
+
             try:
-                # Non-streaming request for these models
-                print(f"Using non-streaming request for {model_name}")
-                api_response = httpx.post(
+                print(f"Streaming request for {model_name}")
+                client = httpx.Client()
+                with client.stream(
+                    "POST",
                     f"{self.api_base}/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=180  # longer timeout for these models
-                )
-                api_response.raise_for_status()
-                
-                # Try to parse JSON
-                try:
-                    json_data = api_response.json()
-                    if "choices" in json_data and json_data["choices"]:
-                        choice = json_data["choices"][0]
-                        if "message" in choice:
-                            content = choice["message"].get("content", "")
-                            if content:
-                                yield content
-                                return
-                except json.JSONDecodeError:
-                    pass
-                    
-                # If JSON parsing fails, return raw text
-                yield api_response.text
-                
+                    timeout=120,
+                ) as stream_response:
+                    stream_response.raise_for_status()
+                    buffer = ""
+
+                    for chunk in stream_response.iter_text():
+                        buffer += chunk
+
+                        # Process complete SSE messages
+                        while "\n\n" in buffer or "\r\n\r\n" in buffer:
+                            if "\n\n" in buffer:
+                                message, buffer = buffer.split("\n\n", 1)
+                            else:
+                                message, buffer = buffer.split("\r\n\r\n", 1)
+
+                            for line in message.split("\n"):
+                                line = line.strip()
+                                if line.startswith("data:"):
+                                    data = line[5:].strip()
+                                    if data == "[DONE]":
+                                        continue
+
+                                    try:
+                                        json_data = json.loads(data)
+                                        if (
+                                            "choices" in json_data
+                                            and json_data["choices"]
+                                        ):
+                                            choice = json_data["choices"][0]
+
+                                            # Handle different response formats
+                                            if "delta" in choice:
+                                                content = choice["delta"].get(
+                                                    "content", ""
+                                                )
+                                                if content:
+                                                    yield content
+                                            elif "text" in choice:
+                                                # Some models might use 'text' instead of 'content'
+                                                content = choice.get("text", "")
+                                                if content:
+                                                    yield content
+                                    except json.JSONDecodeError:
+                                        # Skip invalid JSON
+                                        continue
+
             except Exception as e:
-                yield f"Error with request: {str(e)}"
-                return
+                print(f"Error with streaming request: {str(e)}")
+                # Fall back to non-streaming on error
+                payload["stream"] = False
+                yield from self._non_streaming_request(
+                    prompt.prompt, headers, payload, model_name
+                )
         else:
-            # For normal models like GPT-4o that handle streaming well
-            if stream:
-                payload["stream"] = True
-                
-                try:
-                    print(f"Streaming request for {model_name}")
-                    client = httpx.Client()
-                    with client.stream(
-                        "POST",
-                        f"{self.api_base}/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=120
-                    ) as stream_response:
-                        stream_response.raise_for_status()
-                        
-                        for chunk in stream_response.iter_text():
-                            if not chunk.strip():
-                                continue
-                                
-                            # Extract content from streaming responses
-                            if chunk.startswith("data: "):
-                                data = chunk[6:].strip()
-                                if data == "[DONE]":
-                                    continue
-                                    
-                                # Try to find content in the chunk
-                                match = re.search(r'"content":"([^"]*)"', data)
-                                if match:
-                                    content = match.group(1)
-                                    if content:
-                                        yield content
-                
-                except Exception as e:
-                    yield f"Error with streaming request: {str(e)}"
-                    return
-            else:
-                # Non-streaming for normal models
-                try:
-                    print(f"Non-streaming request for {model_name}")
-                    api_response = httpx.post(
-                        f"{self.api_base}/chat/completions",
-                        headers=headers,
-                        json=payload,
-                        timeout=120
-                    )
-                    api_response.raise_for_status()
-                    json_data = api_response.json()
-                    
-                    if "choices" in json_data and json_data["choices"]:
-                        choice = json_data["choices"][0]
-                        if "message" in choice:
-                            content = choice["message"].get("content", "")
-                            if content:
-                                yield content
-                                return
-                                
-                    yield "Could not extract content from response"
-                    
-                except Exception as e:
-                    yield f"Error with request: {str(e)}"
-                    return
+            # Use non-streaming request
+            yield from self._non_streaming_request(prompt, headers, payload, model_name)

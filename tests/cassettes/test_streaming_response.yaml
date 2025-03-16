@@ -1,0 +1,75 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      content-type:
+      - application/json
+      host:
+      - api.githubcopilot.com
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.githubcopilot.com/models
+  response:
+    body:
+      string: '{"data":[{"capabilities":{"family":"gpt-3.5-turbo","limits":{"max_context_window_tokens":16384,"max_output_tokens":4096,"max_prompt_tokens":12288},"object":"model_capabilities","supports":{"streaming":true,"tool_calls":true},"tokenizer":"cl100k_base","type":"chat"},"id":"gpt-3.5-turbo","model_picker_enabled":false,"name":"GPT
+        3.5 Turbo","object":"model","preview":false,"vendor":"Azure OpenAI","version":"gpt-3.5-turbo-0613"},{"capabilities":{"family":"gpt-3.5-turbo","limits":{"max_context_window_tokens":16384,"max_output_tokens":4096,"max_prompt_tokens":12288},"object":"model_capabilities","supports":{"streaming":true,"tool_calls":true},"tokenizer":"cl100k_base","type":"chat"},"id":"gpt-3.5-turbo-0613","model_picker_enabled":false,"name":"GPT
+        3.5 Turbo","object":"model","preview":false,"vendor":"Azure OpenAI","version":"gpt-3.5-turbo-0613"},{"capabilities":{"family":"gpt-4o-mini","limits":{"max_context_window_tokens":128000,"max_output_tokens":4096,"max_prompt_tokens":12288},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"gpt-4o-mini","model_picker_enabled":false,"name":"GPT-4o
+        mini","object":"model","preview":false,"vendor":"Azure OpenAI","version":"gpt-4o-mini-2024-07-18"},{"capabilities":{"family":"gpt-4o-mini","limits":{"max_context_window_tokens":128000,"max_output_tokens":4096,"max_prompt_tokens":12288},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"gpt-4o-mini-2024-07-18","model_picker_enabled":false,"name":"GPT-4o
+        mini","object":"model","preview":false,"vendor":"Azure OpenAI","version":"gpt-4o-mini-2024-07-18"},{"capabilities":{"family":"gpt-4","limits":{"max_context_window_tokens":32768,"max_output_tokens":4096,"max_prompt_tokens":32768},"object":"model_capabilities","supports":{"streaming":true,"tool_calls":true},"tokenizer":"cl100k_base","type":"chat"},"id":"gpt-4","model_picker_enabled":false,"name":"GPT
+        4","object":"model","preview":false,"vendor":"Azure OpenAI","version":"gpt-4-0613"},{"capabilities":{"family":"gpt-4","limits":{"max_context_window_tokens":32768,"max_output_tokens":4096,"max_prompt_tokens":32768},"object":"model_capabilities","supports":{"streaming":true,"tool_calls":true},"tokenizer":"cl100k_base","type":"chat"},"id":"gpt-4-0613","model_picker_enabled":false,"name":"GPT
+        4","object":"model","preview":false,"vendor":"Azure OpenAI","version":"gpt-4-0613"},{"capabilities":{"family":"gpt-4o","limits":{"max_context_window_tokens":128000,"max_output_tokens":4096,"max_prompt_tokens":64000,"vision":{"max_prompt_image_size":3145728,"max_prompt_images":1,"supported_media_types":["image/jpeg","image/png","image/webp","image/gif"]}},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true,"vision":true},"tokenizer":"o200k_base","type":"chat"},"id":"gpt-4o","model_picker_enabled":true,"name":"GPT-4o","object":"model","preview":false,"vendor":"Azure
+        OpenAI","version":"gpt-4o-2024-05-13"},{"capabilities":{"family":"gpt-4o","limits":{"max_context_window_tokens":128000,"max_output_tokens":4096,"max_prompt_tokens":64000,"vision":{"max_prompt_image_size":3145728,"max_prompt_images":1,"supported_media_types":["image/jpeg","image/png","image/webp","image/gif"]}},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true,"vision":true},"tokenizer":"o200k_base","type":"chat"},"id":"gpt-4o-2024-05-13","model_picker_enabled":false,"name":"GPT-4o","object":"model","preview":false,"vendor":"Azure
+        OpenAI","version":"gpt-4o-2024-05-13"},{"capabilities":{"family":"gpt-4o","limits":{"max_context_window_tokens":128000,"max_output_tokens":4096,"max_prompt_tokens":64000},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"gpt-4-o-preview","model_picker_enabled":false,"name":"GPT-4o","object":"model","preview":false,"vendor":"Azure
+        OpenAI","version":"gpt-4o-2024-05-13"},{"capabilities":{"family":"gpt-4o","limits":{"max_context_window_tokens":128000,"max_output_tokens":16384,"max_prompt_tokens":64000},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"gpt-4o-2024-08-06","model_picker_enabled":false,"name":"GPT-4o","object":"model","preview":false,"vendor":"Azure
+        OpenAI","version":"gpt-4o-2024-08-06"},{"capabilities":{"family":"gpt-4o","limits":{"max_context_window_tokens":128000,"max_output_tokens":16384,"max_prompt_tokens":64000,"vision":{"max_prompt_image_size":3145728,"max_prompt_images":1,"supported_media_types":["image/jpeg","image/png","image/webp","image/gif"]}},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true,"vision":true},"tokenizer":"o200k_base","type":"chat"},"id":"gpt-4o-2024-11-20","model_picker_enabled":false,"name":"GPT-4o","object":"model","preview":false,"vendor":"Azure
+        OpenAI","version":"gpt-4o-2024-11-20"},{"capabilities":{"family":"text-embedding-ada-002","limits":{"max_inputs":256},"object":"model_capabilities","supports":{},"tokenizer":"cl100k_base","type":"embeddings"},"id":"text-embedding-ada-002","model_picker_enabled":false,"name":"Embedding
+        V2 Ada","object":"model","preview":false,"vendor":"Azure OpenAI","version":"text-embedding-ada-002"},{"capabilities":{"family":"text-embedding-3-small","limits":{"max_inputs":512},"object":"model_capabilities","supports":{"dimensions":true},"tokenizer":"cl100k_base","type":"embeddings"},"id":"text-embedding-3-small","model_picker_enabled":false,"name":"Embedding
+        V3 small","object":"model","preview":false,"vendor":"Azure OpenAI","version":"text-embedding-3-small"},{"capabilities":{"family":"text-embedding-3-small","object":"model_capabilities","supports":{"dimensions":true},"tokenizer":"cl100k_base","type":"embeddings"},"id":"text-embedding-3-small-inference","model_picker_enabled":false,"name":"Embedding
+        V3 small (Inference)","object":"model","preview":false,"vendor":"Azure OpenAI","version":"text-embedding-3-small"},{"capabilities":{"family":"o1-ga","limits":{"max_context_window_tokens":200000,"max_prompt_tokens":20000},"object":"model_capabilities","supports":{"structured_outputs":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"o1","model_picker_enabled":true,"name":"o1
+        (Preview)","object":"model","preview":true,"vendor":"Azure OpenAI","version":"o1-2024-12-17"},{"capabilities":{"family":"o1-ga","limits":{"max_context_window_tokens":200000,"max_prompt_tokens":20000},"object":"model_capabilities","supports":{"structured_outputs":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"o1-2024-12-17","model_picker_enabled":false,"name":"o1
+        (Preview)","object":"model","preview":true,"vendor":"Azure OpenAI","version":"o1-2024-12-17"},{"capabilities":{"family":"o3-mini","limits":{"max_context_window_tokens":200000,"max_output_tokens":100000,"max_prompt_tokens":64000},"object":"model_capabilities","supports":{"streaming":true,"structured_outputs":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"o3-mini","model_picker_enabled":true,"name":"o3-mini
+        (Preview)","object":"model","preview":true,"vendor":"Azure OpenAI","version":"o3-mini-2025-01-31"},{"capabilities":{"family":"o3-mini","limits":{"max_context_window_tokens":200000,"max_output_tokens":100000,"max_prompt_tokens":64000},"object":"model_capabilities","supports":{"streaming":true,"structured_outputs":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"o3-mini-2025-01-31","model_picker_enabled":false,"name":"o3-mini
+        (Preview)","object":"model","preview":true,"vendor":"Azure OpenAI","version":"o3-mini-2025-01-31"},{"capabilities":{"family":"o3-mini","limits":{"max_context_window_tokens":200000,"max_output_tokens":100000,"max_prompt_tokens":64000},"object":"model_capabilities","supports":{"streaming":true,"structured_outputs":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"o3-mini-paygo","model_picker_enabled":false,"name":"o3-mini
+        (Preview)","object":"model","preview":true,"vendor":"Azure OpenAI","version":"o3-mini-paygo"},{"capabilities":{"family":"claude-3.5-sonnet","limits":{"max_context_window_tokens":90000,"max_output_tokens":8192,"max_prompt_tokens":90000,"vision":{"max_prompt_image_size":3145728,"max_prompt_images":1,"supported_media_types":["image/jpeg","image/png","image/gif","image/webp"]}},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"claude-3.5-sonnet","model_picker_enabled":true,"name":"Claude
+        3.5 Sonnet (Preview)","object":"model","policy":{"state":"enabled","terms":"Enable
+        access to the latest Claude 3.5 Sonnet model from Anthropic. [Learn more about
+        how GitHub Copilot serves Claude 3.5 Sonnet](https://docs.github.com/copilot/using-github-copilot/using-claude-sonnet-in-github-copilot)."},"preview":true,"vendor":"Anthropic","version":"claude-3.5-sonnet"},{"capabilities":{"family":"claude-3.7-sonnet","limits":{"max_context_window_tokens":200000,"max_output_tokens":8192,"max_prompt_tokens":90000},"object":"model_capabilities","supports":{"parallel_tool_calls":true,"streaming":true,"tool_calls":true},"tokenizer":"o200k_base","type":"chat"},"id":"claude-3.7-sonnet","model_picker_enabled":true,"name":"Claude
+        3.7 Sonnet (Preview)","object":"model","policy":{"state":"enabled","terms":"Enable
+        access to the latest Claude 3.7 Sonnet model from Anthropic. [Learn more about
+        how GitHub Copilot serves Claude 3.7 Sonnet](https://docs.github.com/copilot/using-github-copilot/using-claude-sonnet-in-github-copilot)."},"preview":true,"vendor":"Anthropic","version":"claude-3.7-sonnet"},{"capabilities":{"family":"claude-3.7-sonnet-thought","limits":{"max_context_window_tokens":200000,"max_output_tokens":8192,"max_prompt_tokens":90000},"object":"model_capabilities","supports":{"streaming":true},"tokenizer":"o200k_base","type":"chat"},"id":"claude-3.7-sonnet-thought","model_picker_enabled":true,"name":"Claude
+        3.7 Sonnet Thinking (Preview)","object":"model","policy":{"state":"enabled","terms":"Enable
+        access to the latest Claude 3.7 Sonnet model from Anthropic. [Learn more about
+        how GitHub Copilot serves Claude 3.7 Sonnet](https://docs.github.com/copilot/using-github-copilot/using-claude-sonnet-in-github-copilot)."},"preview":true,"vendor":"Anthropic","version":"claude-3.7-sonnet-thought"},{"capabilities":{"family":"gemini-2.0-flash","limits":{"max_context_window_tokens":1000000,"max_output_tokens":8192,"max_prompt_tokens":128000,"vision":{"max_prompt_image_size":3145728,"max_prompt_images":1,"supported_media_types":["image/jpeg","image/png","image/webp","image/heic","image/heif"]}},"object":"model_capabilities","supports":{"streaming":true},"tokenizer":"o200k_base","type":"chat"},"id":"gemini-2.0-flash-001","model_picker_enabled":true,"name":"Gemini
+        2.0 Flash (Preview)","object":"model","policy":{"state":"enabled","terms":"Enable
+        access to the latest Gemini models from Google. [Learn more about how GitHub
+        Copilot serves Gemini 2.0 Flash](https://docs.github.com/en/copilot/using-github-copilot/ai-models/using-gemini-flash-in-github-copilot)."},"preview":true,"vendor":"Google","version":"gemini-2.0-flash-001"}],"object":"list"}
+
+        '
+    headers:
+      Cache-Control:
+      - private, max-age=21600
+      Content-Security-Policy:
+      - default-src 'none'; sandbox
+      Content-Type:
+      - application/json
+      Date:
+      - Sun, 16 Mar 2025 15:38:37 GMT
+      Strict-Transport-Security:
+      - max-age=31536000
+      Transfer-Encoding:
+      - chunked
+      X-GitHub-Request-Id:
+      - D37F:1EC402:DEC7AD:16202EC:67D6F07D
+      x-github-backend:
+      - Kubernetes
+    status:
+      code: 200
+      message: OK
+version: 1

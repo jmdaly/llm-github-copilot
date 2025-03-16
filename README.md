@@ -50,3 +50,25 @@ cd llm-github-copilot
 # Install in development mode
 llm install -e .
 ```
+
+## Testing
+
+To run the tests:
+
+```bash
+# Install test dependencies
+pip install -e ".[test]"
+
+# Run tests
+pytest
+
+# Run tests with coverage
+pytest --cov=llm_github_copilot
+```
+
+If you want to record new VCR cassettes for tests, set your API key:
+
+```bash
+export PYTEST_GITHUB_COPILOT_API_KEY=your_api_key_here
+pytest --vcr-record=new_episodes
+```

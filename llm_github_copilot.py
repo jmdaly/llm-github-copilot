@@ -423,7 +423,8 @@ class GitHubCopilot(llm.Model):
                 # Process models from response - models are in the "data" field
                 for model in models_data.get("data", []):
                     model_id = model.get("id")
-                    if model_id and model_id != cls.DEFAULT_MODEL_MAPPING:
+                    if model_id:
+                        # Add all models, including the default one
                         mappings[f"github-copilot/{model_id}"] = model_id
 
                 cls._model_mappings = mappings

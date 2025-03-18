@@ -20,3 +20,14 @@ Issues = "https://github.com/jmdaly/llm-github-copilot/issues"
 
 [project.entry-points.llm]
 github_copilot = "llm_github_copilot"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-vcr",
+    "vcrpy",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

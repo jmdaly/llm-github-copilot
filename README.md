@@ -26,11 +26,6 @@ llm -m github-copilot "Write a Python function that calculates the Fibonacci seq
 llm -m github-copilot "Tell me a joke" -o max_tokens 100
 ```
 
-## Available models
-
-- `github-copilot` - The default GitHub Copilot model (currently maps to GPT-4o)
-- `github-copilot/claude-3-7-sonnet-thought` - Anthropic's Claude 3.7 Sonnet with thought process
-
 ## Options
 
 The GitHub Copilot plugin supports the following options:
@@ -61,9 +56,6 @@ pip install -e ".[test]"
 
 # Run tests
 pytest
-
-# Run tests with coverage
-pytest --cov=llm_github_copilot
 ```
 
 If you want to record new VCR cassettes for tests, set your API key:

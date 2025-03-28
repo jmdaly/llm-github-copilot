@@ -1,3 +1,9 @@
+
+[![PyPI](https://img.shields.io/pypi/v/llm-github-copilot.svg)](https://pypi.org/project/llm-github-copilot/)
+[![Changelog](https://img.shields.io/github/v/release/jmdaly/llm-github-copilot?include_prereleases&label=changelog)](https://github.com/jmdaly/llm-github-copilot/releases)
+[![Tests](https://github.com/jmdaly/llm-github-copilot/actions/workflows/test.yml/badge.svg)](https://github.com/jmdaly/llm-github-copilot/actions/workflows/test.yml)
+
+
 # llm-github-copilot
 
 A plugin for [LLM](https://llm.datasette.io/) adding support for [GitHub Copilot](https://github.com/features/copilot).
@@ -13,6 +19,9 @@ llm install llm-github-copilot
 ## Authentication
 
 This plugin uses GitHub's device code authentication flow. When you first use the plugin, it will prompt you to visit GitHub and enter a code to authenticate.
+
+Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 completions and 50 chat requests per month.
+
 
 ## Usage
 

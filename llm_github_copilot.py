@@ -4,7 +4,7 @@ import json
 import time
 import httpx
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any
 from pydantic import Field, field_validator
 
 
@@ -126,7 +126,7 @@ class GitHubCopilotAuthenticator:
         if not os.path.exists(self.token_dir):
             os.makedirs(self.token_dir, exist_ok=True)
 
-    def _get_github_headers(self, access_token: Optional[str] = None) -> Dict[str, str]:
+    def _get_github_headers(self, access_token: Optional[str] = None) -> dict[str, str]:
         """Generate standard GitHub headers for API requests."""
         headers = self.DEFAULT_HEADERS.copy()
 
@@ -192,7 +192,7 @@ class GitHubCopilotAuthenticator:
         except Exception as e:
             raise Exception(f"Failed to get API key: {str(e)}")
 
-    def _get_device_code(self) -> Dict[str, str]:
+    def _get_device_code(self) -> dict[str, str]:
         """
         Get a device code for GitHub authentication.
         """
@@ -289,7 +289,7 @@ class GitHubCopilotAuthenticator:
 
         return self._poll_for_access_token(device_code)
 
-    def _refresh_api_key(self) -> Dict[str, Any]:
+    def _refresh_api_key(self) -> dict[str, Any]:
         """
         Refresh the API key using the access token.
         """
@@ -653,7 +653,7 @@ class GitHubCopilot(llm.Model):
 
     def _build_conversation_messages(
         self, prompt, conversation
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """
         Build the messages array from conversation history.
 

@@ -4,7 +4,7 @@ import json
 import time
 import httpx
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, Generator
 from pydantic import Field, field_validator
 
 
@@ -36,16 +36,7 @@ def register_models(register):
         print("Falling back to default model only")
 
 
-def fetch_available_models(authenticator):
-    """
-    Fetch available models from GitHub Copilot.
-
-    Args:
-        authenticator: The GitHubCopilotAuthenticator instance
-
-    Returns:
-        Set of model IDs
-    """
+def fetch_available_models(authenticator: "GitHubCopilotAuthenticator") -> set[str]:
     try:
         # Get API key
         api_key = authenticator.get_api_key()
@@ -383,12 +374,12 @@ class GitHubCopilot(llm.Model):
                 raise ValueError("temperature must be between 0 and 1")
             return temperature
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the GitHub Copilot model."""
         self.authenticator = GitHubCopilotAuthenticator()
 
     @classmethod
-    def get_model_mappings(cls):
+    def get_model_mappings(cls) -> dict[str, str]:
         """
         Get model mappings, fetching them if not already cached.
 
@@ -439,7 +430,7 @@ class GitHubCopilot(llm.Model):
         return cls._model_mappings
 
     @classmethod
-    def get_streaming_models(cls):
+    def get_streaming_models(cls) -> list[str]:
         """
         Get list of models that support streaming.
 
@@ -516,19 +507,7 @@ class GitHubCopilot(llm.Model):
         # Use the mapping or default to gpt-4o
         return mappings.get(model, self.DEFAULT_MODEL_MAPPING)
 
-    def _non_streaming_request(self, prompt, headers, payload, model_name):
-        """
-        Handle non-streaming requests.
-
-        Args:
-            prompt: The user prompt
-            headers: Request headers
-            payload: Request payload
-            model_name: The model name for logging
-
-        Yields:
-            Generated text content
-        """
+    def _non_streaming_request(self, prompt: llm.Prompt, headers: dict[str,str], payload: dict[str,Any], model_name: str):
         try:
             # Ensure stream is set to false
             payload["stream"] = False
@@ -590,19 +569,7 @@ class GitHubCopilot(llm.Model):
             print(error_text)
             yield error_text
 
-    def execute(self, prompt, stream, response, conversation):
-        """
-        Execute the GitHub Copilot completion.
-
-        Args:
-            prompt: The user prompt
-            stream: Whether to stream the response
-            response: The response object
-            conversation: The conversation history
-
-        Yields:
-            Generated text content
-        """
+    def execute(self, prompt: llm.Prompt, stream: bool, response: llm.Response, conversation: Optional[llm.Conversation]) -> Generator[str, None, None]:
         # Get API key
         try:
             api_key = self.authenticator.get_api_key()
@@ -652,18 +619,8 @@ class GitHubCopilot(llm.Model):
             yield from self._non_streaming_request(prompt, headers, payload, model_name)
 
     def _build_conversation_messages(
-        self, prompt, conversation
+        self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]
     ) -> list[dict[str, str]]:
-        """
-        Build the messages array from conversation history.
-
-        Args:
-            prompt: The current prompt
-            conversation: The conversation history
-
-        Returns:
-            List of message dictionaries
-        """
         messages = []
 
         # Extract messages from conversation history
@@ -701,19 +658,7 @@ class GitHubCopilot(llm.Model):
 
         return messages
 
-    def _handle_streaming_request(self, prompt, headers, payload, model_name):
-        """
-        Handle streaming requests to the API.
-
-        Args:
-            prompt: The user prompt
-            headers: Request headers
-            payload: Request payload
-            model_name: The model name for logging
-
-        Yields:
-            Generated text content
-        """
+    def _handle_streaming_request(self, prompt: llm.Prompt, headers: dict[str,str], payload: dict[str,Any], model_name: str) -> Generator[str, None, None]:
         try:
             with httpx.Client() as client:
                 with client.stream(

@@ -22,6 +22,7 @@ test = [
     "pytest-asyncio",
     "pytest-vcr",
     "vcrpy",
+    "watching-testrunner",
 ]
 
 [tool.pytest.ini_options]

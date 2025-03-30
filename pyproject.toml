@@ -3,16 +3,11 @@ name = "llm-github-copilot"
 version = "0.1"
 description = "GitHub Copilot plugin for LLM CLI tool"
 readme = "README.md"
-authors = [{name = "John M Daly"}]
-license = {text = "Apache-2.0"}
-classifiers = [
-    "License :: OSI Approved :: Apache Software License"
-]
-dependencies = [
-    "llm",
-    "httpx"
-]
 requires-python = ">=3.7"
+authors = [{ name = "John M Daly" }]
+license = { text = "Apache-2.0" }
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+dependencies = ["llm", "httpx"]
 
 [project.urls]
 Homepage = "https://github.com/jmdaly/llm-github-copilot"

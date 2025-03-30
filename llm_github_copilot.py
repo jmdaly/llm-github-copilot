@@ -2,6 +2,7 @@ import llm
 import os
 import json
 import time
+from pathlib import Path
 import httpx
 from datetime import datetime
 from typing import Optional, Any, Generator
@@ -99,23 +100,13 @@ class GitHubCopilotAuthenticator:
 
     def __init__(self) -> None:
         # Token storage paths
-        self.token_dir = os.getenv(
+        self.token_dir = Path(os.getenv(
             "GITHUB_COPILOT_TOKEN_DIR",
             os.path.expanduser("~/.config/llm/github_copilot"),
-        )
-        self.access_token_file = os.path.join(
-            self.token_dir,
-            os.getenv("GITHUB_COPILOT_ACCESS_TOKEN_FILE", "access-token"),
-        )
-        self.api_key_file = os.path.join(
-            self.token_dir, os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
-        )
-        self._ensure_token_dir()
-
-    def _ensure_token_dir(self) -> None:
-        """Ensure the token directory exists."""
-        if not os.path.exists(self.token_dir):
-            os.makedirs(self.token_dir, exist_ok=True)
+        ))
+        self.token_dir.mkdir(parents=True, exist_ok=True)
+        self.access_token_file = self.token_dir / os.getenv("GITHUB_COPILOT_ACCESS_TOKEN_FILE", "access-token")
+        self.api_key_file = self.token_dir / os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
 
     def _get_github_headers(self, access_token: Optional[str] = None) -> dict[str, str]:
         """Generate standard GitHub headers for API requests."""
@@ -132,11 +123,10 @@ class GitHubCopilotAuthenticator:
         """
         # Try to read existing token
         try:
-            with open(self.access_token_file, "r") as f:
-                access_token = f.read().strip()
-                if access_token:
-                    return access_token
-        except (IOError, FileNotFoundError):
+            access_token = self.access_token_file.read_text().strip()
+            if access_token:
+                return access_token
+        except FileNotFoundError:
             # File doesn't exist or can't be read
             pass
 
@@ -146,11 +136,10 @@ class GitHubCopilotAuthenticator:
                 access_token = self._login()
                 # Save the new token
                 try:
-                    with open(self.access_token_file, "w") as f:
-                        f.write(access_token)
-                    os.chmod(self.access_token_file, 0o600)
-                except (IOError, FileNotFoundError):
-                    print("Error saving access token to file")
+                    self.access_token_file.write_text(access_token)
+                    self.access_token_file.chmod(0o600)
+                except OSError:
+                    print(f"Error saving access token to file {self.access_token_file}")
                 return access_token
             except Exception as e:
                 print(
@@ -166,19 +155,18 @@ class GitHubCopilotAuthenticator:
         """
         Get the API key, refreshing if necessary.
         """
+
         try:
-            with open(self.api_key_file, "r") as f:
-                api_key_info = json.load(f)
-                if api_key_info.get("expires_at", 0) > datetime.now().timestamp():
-                    return api_key_info.get("token")
-        except (IOError, json.JSONDecodeError, KeyError):
+            api_key_info = json.loads(self.api_key_file.read_text())
+            if api_key_info.get("expires_at", 0) > datetime.now().timestamp():
+                return api_key_info.get("token")
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
             pass
 
         try:
             api_key_info = self._refresh_api_key()
-            with open(self.api_key_file, "w") as f:
-                json.dump(api_key_info, f)
-                os.chmod(self.api_key_file, 0o600)
+            self.api_key_file.write_text(json.dumps(api_key_info), encoding="utf-8")
+            self.api_key_file.chmod(0o600)
             return api_key_info.get("token")
         except Exception as e:
             raise Exception(f"Failed to get API key: {str(e)}")
@@ -431,12 +419,6 @@ class GitHubCopilot(llm.Model):
 
     @classmethod
     def get_streaming_models(cls) -> list[str]:
-        """
-        Get list of models that support streaming.
-
-        Returns:
-            List of model names that support streaming
-        """
         if cls._streaming_models is None:
             try:
                 # Create a temporary authenticator to fetch models

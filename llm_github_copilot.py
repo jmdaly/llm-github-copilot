@@ -2,9 +2,10 @@ import llm
 import os
 import json
 import time
+from pathlib import Path
 import httpx
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any, Generator
 from pydantic import Field, field_validator
 
 
@@ -36,16 +37,7 @@ def register_models(register):
         print("Falling back to default model only")
 
 
-def fetch_available_models(authenticator):
-    """
-    Fetch available models from GitHub Copilot.
-
-    Args:
-        authenticator: The GitHubCopilotAuthenticator instance
-
-    Returns:
-        Set of model IDs
-    """
+def fetch_available_models(authenticator: "GitHubCopilotAuthenticator") -> set[str]:
     try:
         # Get API key
         api_key = authenticator.get_api_key()
@@ -108,25 +100,15 @@ class GitHubCopilotAuthenticator:
 
     def __init__(self) -> None:
         # Token storage paths
-        self.token_dir = os.getenv(
+        self.token_dir = Path(os.getenv(
             "GITHUB_COPILOT_TOKEN_DIR",
             os.path.expanduser("~/.config/llm/github_copilot"),
-        )
-        self.access_token_file = os.path.join(
-            self.token_dir,
-            os.getenv("GITHUB_COPILOT_ACCESS_TOKEN_FILE", "access-token"),
-        )
-        self.api_key_file = os.path.join(
-            self.token_dir, os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
-        )
-        self._ensure_token_dir()
+        ))
+        self.token_dir.mkdir(parents=True, exist_ok=True)
+        self.access_token_file = self.token_dir / os.getenv("GITHUB_COPILOT_ACCESS_TOKEN_FILE", "access-token")
+        self.api_key_file = self.token_dir / os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
 
-    def _ensure_token_dir(self) -> None:
-        """Ensure the token directory exists."""
-        if not os.path.exists(self.token_dir):
-            os.makedirs(self.token_dir, exist_ok=True)
-
-    def _get_github_headers(self, access_token: Optional[str] = None) -> Dict[str, str]:
+    def _get_github_headers(self, access_token: Optional[str] = None) -> dict[str, str]:
         """Generate standard GitHub headers for API requests."""
         headers = self.DEFAULT_HEADERS.copy()
 
@@ -141,11 +123,10 @@ class GitHubCopilotAuthenticator:
         """
         # Try to read existing token
         try:
-            with open(self.access_token_file, "r") as f:
-                access_token = f.read().strip()
-                if access_token:
-                    return access_token
-        except (IOError, FileNotFoundError):
+            access_token = self.access_token_file.read_text().strip()
+            if access_token:
+                return access_token
+        except FileNotFoundError:
             # File doesn't exist or can't be read
             pass
 
@@ -155,11 +136,10 @@ class GitHubCopilotAuthenticator:
                 access_token = self._login()
                 # Save the new token
                 try:
-                    with open(self.access_token_file, "w") as f:
-                        f.write(access_token)
-                    os.chmod(self.access_token_file, 0o600)
-                except (IOError, FileNotFoundError):
-                    print("Error saving access token to file")
+                    self.access_token_file.write_text(access_token)
+                    self.access_token_file.chmod(0o600)
+                except OSError:
+                    print(f"Error saving access token to file {self.access_token_file}")
                 return access_token
             except Exception as e:
                 print(
@@ -175,24 +155,23 @@ class GitHubCopilotAuthenticator:
         """
         Get the API key, refreshing if necessary.
         """
+
         try:
-            with open(self.api_key_file, "r") as f:
-                api_key_info = json.load(f)
-                if api_key_info.get("expires_at", 0) > datetime.now().timestamp():
-                    return api_key_info.get("token")
-        except (IOError, json.JSONDecodeError, KeyError):
+            api_key_info = json.loads(self.api_key_file.read_text())
+            if api_key_info.get("expires_at", 0) > datetime.now().timestamp():
+                return api_key_info.get("token")
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
             pass
 
         try:
             api_key_info = self._refresh_api_key()
-            with open(self.api_key_file, "w") as f:
-                json.dump(api_key_info, f)
-                os.chmod(self.api_key_file, 0o600)
+            self.api_key_file.write_text(json.dumps(api_key_info), encoding="utf-8")
+            self.api_key_file.chmod(0o600)
             return api_key_info.get("token")
         except Exception as e:
             raise Exception(f"Failed to get API key: {str(e)}")
 
-    def _get_device_code(self) -> Dict[str, str]:
+    def _get_device_code(self) -> dict[str, str]:
         """
         Get a device code for GitHub authentication.
         """
@@ -289,7 +268,7 @@ class GitHubCopilotAuthenticator:
 
         return self._poll_for_access_token(device_code)
 
-    def _refresh_api_key(self) -> Dict[str, Any]:
+    def _refresh_api_key(self) -> dict[str, Any]:
         """
         Refresh the API key using the access token.
         """
@@ -383,12 +362,12 @@ class GitHubCopilot(llm.Model):
                 raise ValueError("temperature must be between 0 and 1")
             return temperature
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the GitHub Copilot model."""
         self.authenticator = GitHubCopilotAuthenticator()
 
     @classmethod
-    def get_model_mappings(cls):
+    def get_model_mappings(cls) -> dict[str, str]:
         """
         Get model mappings, fetching them if not already cached.
 
@@ -439,13 +418,7 @@ class GitHubCopilot(llm.Model):
         return cls._model_mappings
 
     @classmethod
-    def get_streaming_models(cls):
-        """
-        Get list of models that support streaming.
-
-        Returns:
-            List of model names that support streaming
-        """
+    def get_streaming_models(cls) -> list[str]:
         if cls._streaming_models is None:
             try:
                 # Create a temporary authenticator to fetch models
@@ -516,19 +489,7 @@ class GitHubCopilot(llm.Model):
         # Use the mapping or default to gpt-4o
         return mappings.get(model, self.DEFAULT_MODEL_MAPPING)
 
-    def _non_streaming_request(self, prompt, headers, payload, model_name):
-        """
-        Handle non-streaming requests.
-
-        Args:
-            prompt: The user prompt
-            headers: Request headers
-            payload: Request payload
-            model_name: The model name for logging
-
-        Yields:
-            Generated text content
-        """
+    def _non_streaming_request(self, prompt: llm.Prompt, headers: dict[str,str], payload: dict[str,Any], model_name: str):
         try:
             # Ensure stream is set to false
             payload["stream"] = False
@@ -590,19 +551,7 @@ class GitHubCopilot(llm.Model):
             print(error_text)
             yield error_text
 
-    def execute(self, prompt, stream, response, conversation):
-        """
-        Execute the GitHub Copilot completion.
-
-        Args:
-            prompt: The user prompt
-            stream: Whether to stream the response
-            response: The response object
-            conversation: The conversation history
-
-        Yields:
-            Generated text content
-        """
+    def execute(self, prompt: llm.Prompt, stream: bool, response: llm.Response, conversation: Optional[llm.Conversation]) -> Generator[str, None, None]:
         # Get API key
         try:
             api_key = self.authenticator.get_api_key()
@@ -652,18 +601,8 @@ class GitHubCopilot(llm.Model):
             yield from self._non_streaming_request(prompt, headers, payload, model_name)
 
     def _build_conversation_messages(
-        self, prompt, conversation
-    ) -> List[Dict[str, str]]:
-        """
-        Build the messages array from conversation history.
-
-        Args:
-            prompt: The current prompt
-            conversation: The conversation history
-
-        Returns:
-            List of message dictionaries
-        """
+        self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]
+    ) -> list[dict[str, str]]:
         messages = []
 
         # Extract messages from conversation history
@@ -701,19 +640,7 @@ class GitHubCopilot(llm.Model):
 
         return messages
 
-    def _handle_streaming_request(self, prompt, headers, payload, model_name):
-        """
-        Handle streaming requests to the API.
-
-        Args:
-            prompt: The user prompt
-            headers: Request headers
-            payload: Request payload
-            model_name: The model name for logging
-
-        Yields:
-            Generated text content
-        """
+    def _handle_streaming_request(self, prompt: llm.Prompt, headers: dict[str,str], payload: dict[str,Any], model_name: str) -> Generator[str, None, None]:
         try:
             with httpx.Client() as client:
                 with client.stream(

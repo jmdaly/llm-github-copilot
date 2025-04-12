@@ -141,8 +141,16 @@ class GitHubCopilotAuthenticator:
     def get_access_token(self) -> str:
         """
         Get GitHub access token, refreshing if necessary.
+        
+        First checks for GH_COPILOT_KEY environment variable,
+        then falls back to the token file.
         """
-        # Try to read existing token
+        # Check environment variable first
+        env_token = os.environ.get("GH_COPILOT_KEY")
+        if env_token and env_token.strip():
+            return env_token.strip()
+            
+        # Try to read existing token from file
         try:
             access_token = self.access_token_file.read_text().strip()
             if access_token:
@@ -804,13 +812,27 @@ def register_commands(cli):
         if authenticator.has_valid_credentials():
             click.echo("GitHub Copilot authentication: ✓ Authenticated")
             
+            # Display the access token
+            try:
+                # Check environment variable first
+                env_token = os.environ.get("GH_COPILOT_KEY")
+                if env_token and env_token.strip():
+                    click.echo(f"Access token (from environment): {env_token.strip()}")
+                elif authenticator.access_token_file.exists():
+                    access_token = authenticator.access_token_file.read_text().strip()
+                    click.echo(f"Access token: {access_token}")
+                else:
+                    click.echo("Access token: Not found")
+            except FileNotFoundError:
+                click.echo("Access token: Not found")
+            
             # Check if we have a valid API key
             try:
                 api_key_info = json.loads(authenticator.api_key_file.read_text())
                 expires_at = api_key_info.get("expires_at", 0)
                 if expires_at > datetime.now().timestamp():
                     expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
-                    click.echo(f"API key expires: {expiry_date}")
+                    click.echo(f"API key refreshed after: {expiry_date}")
                 else:
                     click.echo("API key has expired. Run 'llm github-copilot auth login' to refresh.")
             except (FileNotFoundError, json.JSONDecodeError, KeyError):
@@ -828,6 +850,38 @@ def register_commands(cli):
         
         return 0
 
+    @auth_group.command(name="refresh")
+    def refresh_command():
+        """
+        Force refresh the GitHub Copilot API key.
+        """
+        authenticator = GitHubCopilotAuthenticator()
+        
+        try:
+            # Check if we have an access token
+            if not authenticator.access_token_file.exists() and not os.environ.get("GH_COPILOT_KEY"):
+                click.echo("No access token found. Run 'llm github-copilot auth login' first.")
+                return 1
+                
+            # Force refresh the API key
+            click.echo("Refreshing API key...")
+            api_key_info = authenticator._refresh_api_key()
+            authenticator.api_key_file.write_text(json.dumps(api_key_info), encoding="utf-8")
+            authenticator.api_key_file.chmod(0o600)
+            
+            # Show expiry information
+            expires_at = api_key_info.get("expires_at", 0)
+            if expires_at > 0:
+                expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                click.echo(f"API key refreshed successfully. Valid until: {expiry_date}")
+            else:
+                click.echo("API key refreshed successfully.")
+                
+            return 0
+        except Exception as e:
+            click.echo(f"Error refreshing API key: {str(e)}", err=True)
+            return 1
+    
     @auth_group.command(name="logout")
     def logout_command():
         """

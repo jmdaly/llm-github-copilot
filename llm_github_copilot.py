@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional, Any, Generator, List
 from pydantic import Field, field_validator
 import click
+import secrets
 
 
 @llm.hookimpl
@@ -100,14 +101,16 @@ class GitHubCopilotAuthenticator:
     MAX_POLL_ATTEMPTS = 12
     POLL_INTERVAL = 5  # seconds
 
+    # Key identifiers for LLM key storage
+    ACCESS_TOKEN_KEY = "github_copilot_access_token"
+    
     def __init__(self) -> None:
-        # Token storage paths
+        # Token storage paths for API key (still using file for this)
         self.token_dir = Path(os.getenv(
             "GITHUB_COPILOT_TOKEN_DIR",
             os.path.expanduser("~/.config/llm/github_copilot"),
         ))
         self.token_dir.mkdir(parents=True, exist_ok=True)
-        self.access_token_file = self.token_dir / os.getenv("GITHUB_COPILOT_ACCESS_TOKEN_FILE", "access-token")
         self.api_key_file = self.token_dir / os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
         
     def has_valid_credentials(self) -> bool:
@@ -122,8 +125,9 @@ class GitHubCopilotAuthenticator:
                     return True
                     
             # Check if we have a valid access token that we can use to get an API key
-            if self.access_token_file.exists():
-                return bool(self.access_token_file.read_text().strip())
+            access_token = llm.get_key(self.ACCESS_TOKEN_KEY)
+            if access_token:
+                return True
                 
             return False
         except (FileNotFoundError, json.JSONDecodeError, KeyError):
@@ -143,32 +147,27 @@ class GitHubCopilotAuthenticator:
         Get GitHub access token, refreshing if necessary.
         
         First checks for GH_COPILOT_KEY environment variable,
-        then falls back to the token file.
+        then falls back to the LLM key storage.
         """
         # Check environment variable first
         env_token = os.environ.get("GH_COPILOT_KEY")
         if env_token and env_token.strip():
             return env_token.strip()
             
-        # Try to read existing token from file
-        try:
-            access_token = self.access_token_file.read_text().strip()
-            if access_token:
-                return access_token
-        except FileNotFoundError:
-            # File doesn't exist or can't be read
-            pass
+        # Try to read existing token from LLM key storage
+        access_token = llm.get_key(self.ACCESS_TOKEN_KEY)
+        if access_token:
+            return access_token
 
         # No valid token found, need to login
         for attempt in range(self.MAX_LOGIN_ATTEMPTS):
             try:
                 access_token = self._login()
-                # Save the new token
+                # Save the new token in LLM key storage
                 try:
-                    self.access_token_file.write_text(access_token)
-                    self.access_token_file.chmod(0o600)
-                except OSError:
-                    print(f"Error saving access token to file {self.access_token_file}")
+                    llm.set_key(self.ACCESS_TOKEN_KEY, access_token)
+                except Exception as e:
+                    print(f"Error saving access token to LLM key storage: {str(e)}")
                 return access_token
             except Exception as e:
                 print(
@@ -192,7 +191,8 @@ class GitHubCopilotAuthenticator:
             pass
 
         # If we don't have a valid API key, check if we need to authenticate first
-        if not self.access_token_file.exists() or not self.access_token_file.read_text().strip():
+        access_token = llm.get_key(self.ACCESS_TOKEN_KEY)
+        if not access_token and not os.environ.get("GH_COPILOT_KEY"):
             raise Exception("GitHub Copilot authentication required. Run 'llm github-copilot auth login' first.")
 
         try:
@@ -778,10 +778,9 @@ def register_commands(cli):
             click.echo("Starting GitHub Copilot authentication...")
             access_token = authenticator._login()
             
-            # Save the access token
-            authenticator.access_token_file.write_text(access_token)
-            authenticator.access_token_file.chmod(0o600)
-            click.echo("Access token saved successfully.")
+            # Save the access token to LLM key storage
+            llm.set_key(authenticator.ACCESS_TOKEN_KEY, access_token)
+            click.echo("Access token saved successfully to LLM key storage.")
             
             # Get the API key
             click.echo("Fetching API key...")
@@ -818,14 +817,15 @@ def register_commands(cli):
                 env_token = os.environ.get("GH_COPILOT_KEY")
                 if env_token and env_token.strip():
                     click.echo(f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)")
-                elif authenticator.access_token_file.exists():
-                    access_token = authenticator.access_token_file.read_text().strip()
-                    token_path = authenticator.access_token_file
-                    click.echo(f"Access token: {access_token} (from file {token_path})")
                 else:
-                    click.echo("Access token: Not found")
-            except FileNotFoundError:
-                click.echo("Access token: Not found")
+                    # Check LLM key storage
+                    access_token = llm.get_key(authenticator.ACCESS_TOKEN_KEY)
+                    if access_token:
+                        click.echo(f"Access token: {access_token} (from LLM key storage)")
+                    else:
+                        click.echo("Access token: Not found")
+            except Exception as e:
+                click.echo(f"Error retrieving access token: {str(e)}")
             
             # Check if we have a valid API key
             try:
@@ -890,10 +890,13 @@ def register_commands(cli):
         """
         authenticator = GitHubCopilotAuthenticator()
         
-        # Remove access token
-        if authenticator.access_token_file.exists():
-            authenticator.access_token_file.unlink()
-            click.echo("Access token removed.")
+        # Remove access token from LLM key storage
+        try:
+            if llm.get_key(authenticator.ACCESS_TOKEN_KEY):
+                llm.delete_key(authenticator.ACCESS_TOKEN_KEY)
+                click.echo("Access token removed from LLM key storage.")
+        except Exception as e:
+            click.echo(f"Error removing access token: {str(e)}")
         
         # Remove API key
         if authenticator.api_key_file.exists():

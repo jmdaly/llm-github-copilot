@@ -941,7 +941,8 @@ def register_commands(cli):
         return 0
 
     @auth_group.command(name="refresh")
-    def refresh_command():
+    @click.option("-v", "--verbose", is_flag=True, help="Show the full API key")
+    def refresh_command(verbose):
         """
         Force refresh the GitHub Copilot API key.
         """
@@ -976,7 +977,14 @@ def register_commands(cli):
                 )
                 click.echo(f"API key expires: {expiry_date}")
                 api_key = api_key_info.get("token", "")
-                click.echo(f"API key: {api_key}")
+                
+                # Only show the full API key in verbose mode
+                if verbose:
+                    click.echo(f"API key: {api_key}")
+                else:
+                    # Show a truncated version of the key for confirmation
+                    truncated_key = api_key[:10] + "..." + api_key[-5:] if len(api_key) > 15 else api_key
+                    click.echo(f"API key: {truncated_key} (use --verbose to show full key)")
             else:
                 click.echo("API key refreshed successfully, but no expiry information found.")
 

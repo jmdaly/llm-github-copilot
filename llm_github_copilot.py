@@ -890,50 +890,53 @@ def register_commands(cli):
         if authenticator.has_valid_credentials():
             click.echo("GitHub Copilot authentication: ✓ Authenticated")
 
-            # Display the access token and its source
-            try:
-                # Check environment variable first
-                env_token = os.environ.get("GH_COPILOT_KEY")
-                if env_token and env_token.strip():
-                    click.echo(
-                        f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)"
-                    )
-                else:
-                    # Check LLM key storage
-                    try:
-                        access_token = llm.get_key(
-                            "github-copilot", authenticator.ACCESS_TOKEN_KEY
-                        )
-                        if access_token:
-                            click.echo(
-                                f"Access token: {access_token} (from LLM key storage)"
-                            )
-                        else:
-                            click.echo("Access token: Not found")
-                    except TypeError:
-                        # Fallback for older LLM versions
+            # Only display the access token if verbose mode is enabled
+            if verbose:
+                try:
+                    # Check environment variable first
+                    env_token = os.environ.get("GH_COPILOT_KEY")
+                    if env_token and env_token.strip():
                         click.echo(
-                            "Access token: Unable to retrieve from LLM key storage (incompatible LLM version)"
+                            f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)"
                         )
-            except Exception as e:
-                click.echo(f"Error retrieving access token: {str(e)}")
+                    else:
+                        # Check LLM key storage
+                        try:
+                            access_token = llm.get_key(
+                                "github-copilot", authenticator.ACCESS_TOKEN_KEY
+                            )
+                            if access_token:
+                                click.echo(
+                                    f"Access token: {access_token} (from LLM key storage)"
+                                )
+                            else:
+                                click.echo("Access token: Not found")
+                        except TypeError:
+                            # Fallback for older LLM versions
+                            click.echo(
+                                "Access token: Unable to retrieve from LLM key storage (incompatible LLM version)"
+                            )
+                except Exception as e:
+                    click.echo(f"Error retrieving access token: {str(e)}")
 
             # Check if we have a valid API key
             try:
                 api_key_info = json.loads(authenticator.api_key_file.read_text())
                 expires_at = api_key_info.get("expires_at", 0)
                 if expires_at > datetime.now().timestamp():
-                    expiry_date = datetime.fromtimestamp(expires_at).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
-                    click.echo(f"API key expires: {expiry_date}")
-                    
-                    # Only show the API key in verbose mode
+                    # Only show API key expiration in verbose mode
                     if verbose:
+                        expiry_date = datetime.fromtimestamp(expires_at).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        click.echo(f"API key expires: {expiry_date}")
+                        
+                        # Show the API key in verbose mode
                         api_key = api_key_info.get("token", "")
                         click.echo(f"API key: {api_key}")
                 else:
-                    click.echo("API key:  <<expired, will refresh on next request>>")
+                    if verbose:
+                        click.echo("API key:  <<expired, will refresh on next request>>")
             except (FileNotFoundError, json.JSONDecodeError, KeyError):
                 click.echo("API key status: Not found or invalid")
 

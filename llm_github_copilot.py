@@ -812,15 +812,16 @@ def register_commands(cli):
         if authenticator.has_valid_credentials():
             click.echo("GitHub Copilot authentication: ✓ Authenticated")
             
-            # Display the access token
+            # Display the access token and its source
             try:
                 # Check environment variable first
                 env_token = os.environ.get("GH_COPILOT_KEY")
                 if env_token and env_token.strip():
-                    click.echo(f"Access token (from environment): {env_token.strip()}")
+                    click.echo(f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)")
                 elif authenticator.access_token_file.exists():
                     access_token = authenticator.access_token_file.read_text().strip()
-                    click.echo(f"Access token: {access_token}")
+                    token_path = authenticator.access_token_file
+                    click.echo(f"Access token: {access_token} (from file {token_path})")
                 else:
                     click.echo("Access token: Not found")
             except FileNotFoundError:

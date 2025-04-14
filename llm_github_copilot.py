@@ -859,12 +859,7 @@ def register_commands(cli):
             except (FileNotFoundError, json.JSONDecodeError, KeyError):
                 click.echo("API key status: Not found or invalid")
                 
-            # Try to fetch available models
-            try:
-                models = fetch_available_models(authenticator)
-                click.echo(f"Available models: {', '.join(models)}")
-            except Exception as e:
-                click.echo(f"Could not fetch models: {str(e)}")
+            # Don't display available models in status command
         else:
             click.echo("GitHub Copilot authentication: ✗ Not authenticated")
             click.echo("Run 'llm github-copilot auth login' to authenticate.")

@@ -213,7 +213,7 @@ class GitHubCopilotAuthenticator:
         then falls back to the LLM key storage.
         """
         # Check environment variable first
-        env_token = os.environ.get("GH_COPILOT_KEY")
+        env_token = os.environ.get("GH_COPILOT_TOKEN")
         if env_token and env_token.strip():
             return env_token.strip()
 
@@ -247,7 +247,7 @@ class GitHubCopilotAuthenticator:
         except (TypeError, Exception):
             access_token = None
 
-        if not access_token and not os.environ.get("GH_COPILOT_KEY"):
+        if not access_token and not os.environ.get("GH_COPILOT_TOKEN"):
             raise Exception(
                 "GitHub Copilot authentication required. Run 'llm github-copilot auth login' first."
             )
@@ -981,16 +981,16 @@ def register_commands(cli):
 
         try:
             # Check if using environment variable
-            using_env_var = bool(os.environ.get("GH_COPILOT_KEY"))
+            using_env_var = bool(os.environ.get("GH_COPILOT_TOKEN"))
 
             if using_env_var:
                 # Using environment variable for access token
-                access_token = os.environ.get("GH_COPILOT_KEY").strip()
+                access_token = os.environ.get("GH_COPILOT_TOKEN").strip()
                 click.echo(
-                    "Not possible to initiate login with environment variable GH_COPILOT_KEY set, please unset"
+                    "Not possible to initiate login with environment variable GH_COPILOT_TOKEN set, please unset"
                 )
                 click.echo(
-                    f"Access token: {access_token} (from environment variable GH_COPILOT_KEY)"
+                    f"Access token: {access_token} (from environment variable GH_COPILOT_TOKEN)"
                 )
                 return 0
             else:
@@ -1047,10 +1047,10 @@ def register_commands(cli):
             if verbose:
                 try:
                     # Check environment variable first
-                    env_token = os.environ.get("GH_COPILOT_KEY")
+                    env_token = os.environ.get("GH_COPILOT_TOKEN")
                     if env_token and env_token.strip():
                         click.echo(
-                            f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)"
+                            f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_TOKEN)"
                         )
                     else:
                         # Check LLM key storage
@@ -1099,7 +1099,7 @@ def register_commands(cli):
         else:
             click.echo("GitHub Copilot authentication: ✗ Not authenticated")
             click.echo(
-                "Run 'llm github-copilot auth login' to authenticate or set $GH_COPILOT_KEY."
+                "Run 'llm github-copilot auth login' to authenticate or set $GH_COPILOT_TOKEN."
             )
 
         return 0
@@ -1121,7 +1121,7 @@ def register_commands(cli):
             except (TypeError, Exception):
                 access_token = None
 
-            if not access_token and not os.environ.get("GH_COPILOT_KEY"):
+            if not access_token and not os.environ.get("GH_COPILOT_TOKEN"):
                 click.echo(
                     "No access token found. Run 'llm github-copilot auth login' first."
                 )

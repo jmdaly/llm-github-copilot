@@ -70,7 +70,7 @@ class TestAuthLogin:
     def test_login_with_env_var(self, cli_runner, mock_authenticator):
         """Test login with GH_COPILOT_KEY environment variable set."""
         # Setup mock for environment variable
-        with patch.dict(os.environ, {"GH_COPILOT_KEY": "test_token"}):
+        with patch.dict(os.environ, {"GH_COPILOT_TOKEN": "test_token"}):
             # Setup mock to indicate not authenticated
             mock_authenticator.has_valid_credentials.return_value = False
             
@@ -79,8 +79,8 @@ class TestAuthLogin:
             @click.option("-f", "--force", is_flag=True)
             def mock_login_command(force):
                 mock_authenticator.has_valid_credentials()
-                if os.environ.get("GH_COPILOT_KEY"):
-                    click.echo("Not possible to initiate login with environment variable GH_COPILOT_KEY set")
+                if os.environ.get("GH_COPILOT_TOKEN"):
+                    click.echo("Not possible to initiate login with environment variable GH_COPILOT_TOKEN set")
             
             # Run the command
             result = cli_runner.invoke(mock_login_command)
@@ -216,7 +216,7 @@ class TestAuthRefresh:
                 except (TypeError, Exception):
                     access_token = None
                 
-                if not access_token and not os.environ.get("GH_COPILOT_KEY"):
+                if not access_token and not os.environ.get("GH_COPILOT_TOKEN"):
                     click.echo("No access token found. Run 'llm github-copilot auth login' first.")
                     return 1
                 return 0
@@ -250,7 +250,7 @@ class TestAuthRefresh:
                 except (TypeError, Exception):
                     access_token = None
                 
-                if access_token or os.environ.get("GH_COPILOT_KEY"):
+                if access_token or os.environ.get("GH_COPILOT_TOKEN"):
                     click.echo("Refreshing API key...")
                     api_key_info = mock_authenticator._refresh_api_key()
                     expires_at = api_key_info.get("expires_at", 0)

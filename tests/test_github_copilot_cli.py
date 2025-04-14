@@ -3,6 +3,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock, mock_open
 from click.testing import CliRunner
+import click
 import llm
 import llm_github_copilot
 from llm_github_copilot import GitHubCopilotAuthenticator

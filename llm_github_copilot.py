@@ -853,6 +853,8 @@ def register_commands(cli):
                 expires_at = api_key_info.get("expires_at", 0)
                 if expires_at > datetime.now().timestamp():
                     expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                    api_key = api_key_info.get("token", "")
+                    click.echo(f"API key: {api_key}")
                     click.echo(f"API key refreshed after: {expiry_date}")
                 else:
                     click.echo("API key has expired. Run 'llm github-copilot auth login' to refresh.")

@@ -12,7 +12,21 @@ import secrets
 
 
 def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
-    """Helper function to fetch raw model data from the API."""
+    """
+    Helper function to fetch raw model data from the GitHub Copilot API.
+    
+    This function makes an HTTP request to the GitHub Copilot API to retrieve
+    information about available models. It handles authentication and error reporting.
+    
+    Args:
+        authenticator: The GitHubCopilotAuthenticator instance to use for authentication
+        
+    Returns:
+        dict: The raw JSON response from the API containing model data
+        
+    Raises:
+        Exception: If the API request fails for any reason
+    """
     try:
         api_key = authenticator.get_api_key()
         headers = {
@@ -68,7 +82,22 @@ def register_models(register):
 
 
 def fetch_available_models(authenticator: "GitHubCopilotAuthenticator") -> set[str]:
-    """Fetches available model IDs from the GitHub Copilot API."""
+    """
+    Fetches available model IDs from the GitHub Copilot API.
+    
+    This function retrieves the list of available models from the GitHub Copilot API
+    and formats them as LLM-compatible model IDs (e.g., "github-copilot/claude-3-7-sonnet").
+    
+    Args:
+        authenticator: The GitHubCopilotAuthenticator instance to use for authentication
+        
+    Returns:
+        set[str]: A set of available model IDs, always including at least "github-copilot"
+        
+    Note:
+        If the API request fails, this function will return a minimal set containing
+        only the default "github-copilot" model ID.
+    """
     model_ids = {"github-copilot"}  # Always include default model
     try:
         models_data = _fetch_models_data(authenticator)
@@ -126,6 +155,16 @@ class GitHubCopilotAuthenticator:
     def has_valid_credentials(self) -> bool:
         """
         Check if we have valid API credentials without triggering authentication.
+        
+        This method checks for valid credentials in the following order:
+        1. Checks if a valid API key file exists with a non-expired token
+        2. Checks if a valid access token exists in the LLM key storage
+        
+        Returns:
+            bool: True if valid credentials exist, False otherwise
+            
+        Note:
+            This method does not attempt to refresh or obtain new credentials.
         """
         try:
             # Check if we have a valid API key
@@ -147,7 +186,18 @@ class GitHubCopilotAuthenticator:
             return False
 
     def _get_github_headers(self, access_token: Optional[str] = None) -> dict[str, str]:
-        """Generate standard GitHub headers for API requests."""
+        """
+        Generate standard GitHub headers for API requests.
+        
+        Creates a dictionary of HTTP headers required for GitHub API requests,
+        optionally including an authorization header with the provided access token.
+        
+        Args:
+            access_token: Optional GitHub access token to include in the headers
+            
+        Returns:
+            dict[str, str]: Dictionary of HTTP headers for GitHub API requests
+        """
         headers = self.DEFAULT_HEADERS.copy()
 
         if access_token:
@@ -212,7 +262,19 @@ class GitHubCopilotAuthenticator:
 
     def _get_device_code(self) -> dict[str, str]:
         """
-        Get a device code for GitHub authentication.
+        Get a device code for GitHub authentication using the device flow.
+        
+        This method initiates the GitHub device flow authentication process by
+        requesting a device code from the GitHub API. The device code is used
+        to associate the user's browser session with this application.
+        
+        Returns:
+            dict[str, str]: A dictionary containing the device code, user code,
+                           verification URI, and other information needed for
+                           the authentication flow
+                           
+        Raises:
+            Exception: If the request fails or the response is missing required fields
         """
         required_fields = ["device_code", "user_code", "verification_uri"]
 
@@ -245,6 +307,20 @@ class GitHubCopilotAuthenticator:
     def _poll_for_access_token(self, device_code: str) -> str:
         """
         Poll for an access token after user authentication.
+        
+        This method repeatedly polls the GitHub API to check if the user has
+        completed the authentication process in their browser. It continues
+        polling until either the user completes authentication, an error occurs,
+        or the maximum number of polling attempts is reached.
+        
+        Args:
+            device_code: The device code obtained from _get_device_code()
+            
+        Returns:
+            str: The GitHub access token if authentication is successful
+            
+        Raises:
+            Exception: If polling times out or an error occurs during polling
         """
         client = httpx.Client()
 
@@ -294,6 +370,17 @@ class GitHubCopilotAuthenticator:
     def _login(self) -> str:
         """
         Login to GitHub Copilot using device code flow.
+        
+        This method orchestrates the complete GitHub device flow authentication process:
+        1. Obtains a device code and user code
+        2. Displays instructions for the user to complete authentication in their browser
+        3. Polls for the access token until the user completes authentication
+        
+        Returns:
+            str: The GitHub access token if authentication is successful
+            
+        Raises:
+            Exception: If any step of the authentication process fails
         """
         device_code_info = self._get_device_code()
 
@@ -311,6 +398,17 @@ class GitHubCopilotAuthenticator:
     def _refresh_api_key(self) -> dict[str, Any]:
         """
         Refresh the API key using the access token.
+        
+        This method exchanges a GitHub access token for a GitHub Copilot API key
+        by making a request to the GitHub Copilot API. It includes retry logic
+        to handle transient failures.
+        
+        Returns:
+            dict[str, Any]: A dictionary containing the API key and its expiration time
+                           in the format {"token": "api_key", "expires_at": timestamp}
+                           
+        Raises:
+            Exception: If the API key cannot be refreshed after maximum retries
         """
         access_token = self.get_access_token()
         headers = self._get_github_headers(access_token)
@@ -410,9 +508,17 @@ class GitHubCopilot(llm.Model):
     def get_model_mappings(cls) -> dict[str, str]:
         """
         Get model mappings, fetching them if not already cached.
-
+        
+        This method retrieves the mapping between LLM model IDs (e.g., "github-copilot/gpt-4o")
+        and the corresponding API model names (e.g., "gpt-4o"). It caches the results
+        to avoid unnecessary API calls.
+        
         Returns:
             Dict mapping model IDs to API model names
+            
+        Note:
+            If fetching the mappings fails, a default mapping will be returned
+            that includes only the default model.
         """
         if cls._model_mappings is None:
             try:
@@ -442,6 +548,19 @@ class GitHubCopilot(llm.Model):
 
     @classmethod
     def get_streaming_models(cls) -> list[str]:
+        """
+        Get the list of models that support streaming responses.
+        
+        This method retrieves information about which models support streaming responses
+        from the GitHub Copilot API. It caches the results to avoid unnecessary API calls.
+        
+        Returns:
+            list[str]: A list of API model names that support streaming
+            
+        Note:
+            If fetching the streaming models fails, it will assume all models
+            support streaming as a fallback.
+        """
         if cls._streaming_models is None:
             try:
                 # Create a temporary authenticator to fetch models
@@ -503,7 +622,27 @@ class GitHubCopilot(llm.Model):
         headers: dict[str, str],
         payload: dict[str, Any],
         model_name: str,
-    ):
+    ) -> Generator[str, None, None]:
+        """
+        Handle a non-streaming request to the GitHub Copilot API.
+        
+        This method sends a non-streaming request to the GitHub Copilot API
+        and processes the response. It handles various response formats and
+        error conditions.
+        
+        Args:
+            prompt: The LLM prompt object
+            headers: HTTP headers for the request
+            payload: The request payload (will have stream=False set)
+            model_name: The API model name to use
+            
+        Yields:
+            str: The generated text from the API response
+            
+        Note:
+            In case of errors, this method yields an error message instead of raising
+            an exception to maintain compatibility with the streaming interface.
+        """
         try:
             # Ensure stream is set to false
             payload["stream"] = False
@@ -572,6 +711,26 @@ class GitHubCopilot(llm.Model):
         response: llm.Response,
         conversation: Optional[llm.Conversation],
     ) -> Generator[str, None, None]:
+        """
+        Execute a prompt against the GitHub Copilot API.
+        
+        This is the main method that processes a prompt and returns a response.
+        It handles authentication, builds the request payload, determines whether
+        to use streaming or non-streaming mode, and processes the response.
+        
+        Args:
+            prompt: The LLM prompt object containing the user's input
+            stream: Whether to stream the response (if supported by the model)
+            response: The LLM response object to populate
+            conversation: Optional conversation history to include in the request
+            
+        Yields:
+            str: Chunks of the generated text from the API response
+            
+        Note:
+            If authentication fails, this method yields an error message instead
+            of raising an exception.
+        """
         # Get API key
         try:
             api_key = self.authenticator.get_api_key()
@@ -627,6 +786,21 @@ class GitHubCopilot(llm.Model):
     def _build_conversation_messages(
         self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]
     ) -> list[dict[str, str]]:
+        """
+        Build the messages array for the API request from the conversation history.
+        
+        This method constructs the messages array required by the GitHub Copilot API
+        by extracting previous messages from the conversation history and adding
+        the current prompt. It also ensures a system message is included.
+        
+        Args:
+            prompt: The current LLM prompt object
+            conversation: Optional conversation history
+            
+        Returns:
+            list[dict[str, str]]: A list of message objects in the format required
+                                 by the GitHub Copilot API, each with 'role' and 'content'
+        """
         messages = []
 
         # Extract messages from conversation history
@@ -671,6 +845,26 @@ class GitHubCopilot(llm.Model):
         payload: dict[str, Any],
         model_name: str,
     ) -> Generator[str, None, None]:
+        """
+        Handle a streaming request to the GitHub Copilot API.
+        
+        This method sends a streaming request to the GitHub Copilot API and
+        processes the server-sent events (SSE) response. It parses each event
+        and extracts the generated text chunks.
+        
+        Args:
+            prompt: The LLM prompt object
+            headers: HTTP headers for the request
+            payload: The request payload (will have stream=True set)
+            model_name: The API model name to use
+            
+        Yields:
+            str: Chunks of the generated text from the streaming API response
+            
+        Note:
+            If streaming fails, this method falls back to a non-streaming request
+            to ensure the user still gets a response.
+        """
         try:
             with httpx.Client() as client:
                 with client.stream(

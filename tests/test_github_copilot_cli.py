@@ -86,7 +86,7 @@ class TestAuthLogin:
             result = cli_runner.invoke(mock_login_command)
             
             # Check the output
-            assert "Not possible to initiate login with environment variable GH_COPILOT_KEY set" in result.output
+            assert "Not possible to initiate login with environment variable GH_COPILOT_TOKEN set" in result.output
     
     def test_login_success(self, cli_runner, mock_authenticator):
         """Test successful login."""

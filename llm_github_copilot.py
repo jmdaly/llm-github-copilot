@@ -984,7 +984,7 @@ def register_commands(cli):
                 else:
                     # Show a truncated version of the key for confirmation
                     truncated_key = api_key[:10] + "..." + api_key[-5:] if len(api_key) > 15 else api_key
-                    click.echo(f"API key: {truncated_key} (use --verbose to show full key)")
+                    click.echo(f"API key: {truncated_key}")
             else:
                 click.echo("API key refreshed successfully, but no expiry information found.")
 

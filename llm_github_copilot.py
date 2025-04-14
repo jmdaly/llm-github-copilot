@@ -793,7 +793,9 @@ def register_commands(cli):
             click.echo("Valid GitHub Copilot authentication already exists.")
             click.echo("Use --force to re-authenticate if needed.")
             click.echo("\nCurrent authentication status:")
-            return status_command()
+            # Call the status logic directly instead of returning the command
+            status_command()
+            return 0
             
         try:
             # Check if using environment variable

@@ -305,5 +305,6 @@ def test_authenticator_get_access_token():
     with patch.dict(os.environ, {}, clear=True):  # Clear env vars
         with patch("llm.get_key", return_value=None):
             with patch.object(authenticator, "_login", return_value="new_token"):
-                with patch("llm.set_key"):
-                    assert authenticator.get_access_token() == "new_token"
+                # Don't try to patch llm.set_key since it doesn't exist
+                # Instead, we'll just test that _login is called and returns the token
+                assert authenticator.get_access_token() == "new_token"

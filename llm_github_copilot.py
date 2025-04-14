@@ -310,6 +310,7 @@ class GitHubCopilotAuthenticator:
         user_code = device_code_info["user_code"]
         verification_uri = device_code_info["verification_uri"]
 
+        click.echo("Fetching API key...")
         print(
             f"\nPlease visit {verification_uri} and enter code {user_code} to authenticate GitHub Copilot.\n"
         )
@@ -790,7 +791,11 @@ def register_commands(cli):
     @cli.group(name="github-copilot")
     def github_copilot_group():
         """
-        Commands for managing GitHub Copilot authentication.
+        Commands for managing GitHub Copilot plugin.
+
+        By default github-copilot will use the following in precedence order to obtain an access_token for communication :
+            $GH_COPILOT_KEY
+            llm keystore for github-copilot
         """
         pass
 
@@ -798,6 +803,7 @@ def register_commands(cli):
     def auth_group():
         """
         Manage GitHub Copilot authentication.
+
         """
         pass
 
@@ -828,12 +834,16 @@ def register_commands(cli):
                 # Using environment variable for access token
                 access_token = os.environ.get("GH_COPILOT_KEY").strip()
                 click.echo(
+                    "Not possible to initiate login with environment variable GH_COPILOT_KEY set, please unset"
+                )
+                click.echo(
                     f"Access token: {access_token} (from environment variable GH_COPILOT_KEY)"
                 )
+                return 0
             else:
                 # Start the login process
                 click.echo(
-                    "Starting GitHub Copilot authentication to generate a new access token..."
+                    "Starting GitHub Copilot login process to obtain an access_token & API key..."
                 )
                 access_token = authenticator._login()
 
@@ -842,31 +852,21 @@ def register_commands(cli):
                     llm.set_key(
                         "github-copilot", authenticator.ACCESS_TOKEN_KEY, access_token
                     )
-                    click.echo(f"Access token: {access_token} (from LLM key storage)")
+                    click.echo(f"Access token: {access_token}")
                 except TypeError:
                     click.echo(
                         "Warning: Unable to save token to LLM key storage (incompatible LLM version)"
                     )
 
             # Get the API key
-            click.echo("Fetching API key...")
             api_key_info = authenticator._refresh_api_key()
             authenticator.api_key_file.write_text(
                 json.dumps(api_key_info), encoding="utf-8"
             )
             authenticator.api_key_file.chmod(0o600)
 
-            # Display API key information in the same format as status
-            expires_at = api_key_info.get("expires_at", 0)
-            if expires_at > 0:
-                expiry_date = datetime.fromtimestamp(expires_at).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
-                click.echo(f"API key expires: {expiry_date}")
-                api_key = api_key_info.get("token", "")
-                click.echo(f"API key: {api_key}")
-
-            click.echo("GitHub Copilot authentication completed successfully!")
+            click.echo("GitHub Copilot login process completed successfully!")
+            click.echo("")
 
             # Fetch available models
             click.echo("Fetching available models...")
@@ -880,7 +880,7 @@ def register_commands(cli):
         return 0
 
     @auth_group.command(name="status")
-    @click.option("-v", "--verbose", is_flag=True, help="Show the full API key")
+    @click.option("-v", "--verbose", is_flag=True, help="Show verbose details")
     def status_command(verbose):
         """
         Check GitHub Copilot authentication status.
@@ -930,25 +930,29 @@ def register_commands(cli):
                             "%Y-%m-%d %H:%M:%S"
                         )
                         click.echo(f"API key expires: {expiry_date}")
-                        
+
                         # Show the API key in verbose mode
                         api_key = api_key_info.get("token", "")
                         click.echo(f"API key: {api_key}")
                 else:
                     if verbose:
-                        click.echo("API key:  <<expired, will refresh on next request>>")
+                        click.echo(
+                            "API key:  <<expired, will refresh on next request>>"
+                        )
             except (FileNotFoundError, json.JSONDecodeError, KeyError):
                 click.echo("API key status: Not found or invalid")
 
             # Don't display available models in status command
         else:
             click.echo("GitHub Copilot authentication: ✗ Not authenticated")
-            click.echo("Run 'llm github-copilot auth login' to authenticate.")
+            click.echo(
+                "Run 'llm github-copilot auth login' to authenticate or set $GH_COPILOT_KEY."
+            )
 
         return 0
 
     @auth_group.command(name="refresh")
-    @click.option("-v", "--verbose", is_flag=True, help="Show the full API key")
+    @click.option("-v", "--verbose", is_flag=True, help="Show verbose details")
     def refresh_command(verbose):
         """
         Force refresh the GitHub Copilot API key.
@@ -958,10 +962,12 @@ def register_commands(cli):
         try:
             # Check if we have an access token
             try:
-                access_token = llm.get_key("github-copilot", authenticator.ACCESS_TOKEN_KEY)
+                access_token = llm.get_key(
+                    "github-copilot", authenticator.ACCESS_TOKEN_KEY
+                )
             except (TypeError, Exception):
                 access_token = None
-                
+
             if not access_token and not os.environ.get("GH_COPILOT_KEY"):
                 click.echo(
                     "No access token found. Run 'llm github-copilot auth login' first."
@@ -984,12 +990,14 @@ def register_commands(cli):
                 )
                 click.echo(f"API key expires: {expiry_date}")
                 api_key = api_key_info.get("token", "")
-                
+
                 # Only show the API key in verbose mode
                 if verbose:
                     click.echo(f"API key: {api_key}")
             else:
-                click.echo("API key refreshed successfully, but no expiry information found.")
+                click.echo(
+                    "API key refreshed successfully, but no expiry information found."
+                )
 
             return 0
         except Exception as e:

@@ -3,7 +3,6 @@
 [![Changelog](https://img.shields.io/github/v/release/jmdaly/llm-github-copilot?include_prereleases&label=changelog)](https://github.com/jmdaly/llm-github-copilot/releases)
 [![Tests](https://github.com/jmdaly/llm-github-copilot/actions/workflows/test.yml/badge.svg)](https://github.com/jmdaly/llm-github-copilot/actions/workflows/test.yml)
 
-
 # llm-github-copilot
 
 A plugin for [LLM](https://llm.datasette.io/) adding support for [GitHub Copilot](https://github.com/features/copilot).
@@ -18,23 +17,9 @@ llm install llm-github-copilot
 
 ## Authentication
 
-This plugin uses GitHub's device code authentication flow. When you first use the plugin, it will prompt you to visit GitHub and enter a code to authenticate.
+This plugin uses GitHub's device code authentication flow to obtain the initial access_token.   This access_token is what is used to initiate and obtain an api_key that is used for communication with the GitHub Copilot API.  This api_key is automatically obtained and refreshed as needed using the access_token.  The access_token is obtained from the LLM key storage or via the environment variable `GH_COPILOT_KEY`.
 
-You can also manage authentication using the CLI:
-
-```bash
-# Login to GitHub Copilot
-llm github-copilot auth login
-
-# Check authentication status
-llm github-copilot auth status
-
-# Force refresh the API key
-llm github-copilot auth refresh
-
-# Logout and remove credentials
-llm github-copilot auth logout
-```
+Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 completions and 50 chat requests per month.
 
 ### Auth Command Help
 
@@ -67,21 +52,25 @@ When you run the login command, the plugin will:
 Example login output:
 
 ```
+Usage: llm github-copilot auth login [OPTIONS]
+
+  Authenticate with GitHub Copilot to generate a new access token.
+
+Options:
+  -f, --force  Force login even if already authenticated
+  --help       Show this message and exit.
+```
+
+```
 $ llm github-copilot auth login
 Starting GitHub Copilot authentication to generate a new access token...
 Please visit https://github.com/login/device and enter code XXXX-XXXX to authenticate GitHub Copilot.
 
 Waiting for authorization... (attempt 1/12)
 Authentication successful!
-Fetching API key...
-API key expires: 2025-04-14 12:34:56
-API key: gcp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-GitHub Copilot authentication completed successfully!
-Fetching available models...
-Available models: github-copilot, github-copilot/gpt-4o
 ```
 
-You can force a new login even if already authenticated:
+You can force a new login and obtain a new access_token even if already authenticated:
 
 ```bash
 llm github-copilot auth login --force
@@ -103,11 +92,8 @@ $ llm github-copilot auth status --verbose
 GitHub Copilot authentication: ✓ Authenticated
 Access token: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (from LLM key storage)
 API key expires: 2025-04-14 12:34:56
-API key: gcp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+API key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
-
-Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 completions and 50 chat requests per month.
-
 
 ## Usage
 

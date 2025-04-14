@@ -54,12 +54,51 @@ Commands:
   status   Check GitHub Copilot authentication status.
 ```
 
-### Status Command Output
+### Authentication Login
+
+When you run the login command, the plugin will:
+
+1. Start the GitHub device code authentication flow
+2. Provide you with a code and URL to visit
+3. Wait for you to authenticate on GitHub's website
+4. Generate and store an access token
+5. Fetch an API key using the access token
+
+Example login output:
+
+```
+$ llm github-copilot auth login
+Starting GitHub Copilot authentication to generate a new access token...
+Please visit https://github.com/login/device and enter code XXXX-XXXX to authenticate GitHub Copilot.
+
+Waiting for authorization... (attempt 1/12)
+Authentication successful!
+Fetching API key...
+API key expires: 2025-04-14 12:34:56
+API key: gcp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GitHub Copilot authentication completed successfully!
+Fetching available models...
+Available models: github-copilot, github-copilot/gpt-4o
+```
+
+You can force a new login even if already authenticated:
+
+```bash
+llm github-copilot auth login --force
+```
+
+### Authentication Status
+
+You can check your authentication status with:
 
 ```
 $ llm github-copilot auth status
 GitHub Copilot authentication: ✓ Authenticated
+```
 
+For more detailed information, use the verbose flag:
+
+```
 $ llm github-copilot auth status --verbose
 GitHub Copilot authentication: ✓ Authenticated
 Access token: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (from LLM key storage)

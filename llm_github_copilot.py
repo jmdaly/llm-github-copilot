@@ -968,15 +968,17 @@ def register_commands(cli):
             )
             authenticator.api_key_file.chmod(0o600)
 
-            # Show expiry information
+            # Show API key information in the same format as status command
             expires_at = api_key_info.get("expires_at", 0)
             if expires_at > 0:
                 expiry_date = datetime.fromtimestamp(expires_at).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
-                click.echo(f"API key refreshed successfully. Expires: {expiry_date}")
+                click.echo(f"API key expires: {expiry_date}")
+                api_key = api_key_info.get("token", "")
+                click.echo(f"API key: {api_key}")
             else:
-                click.echo("API key refreshed successfully.")
+                click.echo("API key refreshed successfully, but no expiry information found.")
 
             return 0
         except Exception as e:

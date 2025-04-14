@@ -783,12 +783,12 @@ def register_commands(cli):
     @auth_group.command(name="login")
     def login_command():
         """
-        Authenticate with GitHub Copilot.
+        Authenticate with GitHub Copilot to generate a new access token.
         """
         authenticator = GitHubCopilotAuthenticator()
         try:
             # Start the login process
-            click.echo("Starting GitHub Copilot authentication...")
+            click.echo("Starting GitHub Copilot authentication to generate a new access token...")
             access_token = authenticator._login()
             
             # Save the access token to LLM key storage

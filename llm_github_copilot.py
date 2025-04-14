@@ -22,7 +22,7 @@ def register_models(register):
     try:
         # Create an authenticator to fetch models
         authenticator = GitHubCopilotAuthenticator()
-        
+
         # Only fetch models if we already have valid credentials
         if authenticator.has_valid_credentials():
             models = fetch_available_models(authenticator)
@@ -103,16 +103,20 @@ class GitHubCopilotAuthenticator:
 
     # Key identifiers for LLM key storage
     ACCESS_TOKEN_KEY = "github_copilot_access_token"
-    
+
     def __init__(self) -> None:
         # Token storage paths for API key (still using file for this)
-        self.token_dir = Path(os.getenv(
-            "GITHUB_COPILOT_TOKEN_DIR",
-            os.path.expanduser("~/.config/llm/github_copilot"),
-        ))
+        self.token_dir = Path(
+            os.getenv(
+                "GITHUB_COPILOT_TOKEN_DIR",
+                os.path.expanduser("~/.config/llm/github_copilot"),
+            )
+        )
         self.token_dir.mkdir(parents=True, exist_ok=True)
-        self.api_key_file = self.token_dir / os.getenv("GITHUB_COPILOT_API_KEY_FILE", "api-key.json")
-        
+        self.api_key_file = self.token_dir / os.getenv(
+            "GITHUB_COPILOT_API_KEY_FILE", "api-key.json"
+        )
+
     def has_valid_credentials(self) -> bool:
         """
         Check if we have valid API credentials without triggering authentication.
@@ -123,7 +127,7 @@ class GitHubCopilotAuthenticator:
                 api_key_info = json.loads(self.api_key_file.read_text())
                 if api_key_info.get("expires_at", 0) > datetime.now().timestamp():
                     return True
-                    
+
             # Check if we have a valid access token that we can use to get an API key
             try:
                 access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
@@ -131,7 +135,7 @@ class GitHubCopilotAuthenticator:
                     return True
             except (TypeError, Exception):
                 pass
-                
+
             return False
         except (FileNotFoundError, json.JSONDecodeError, KeyError):
             return False
@@ -148,7 +152,7 @@ class GitHubCopilotAuthenticator:
     def get_access_token(self) -> str:
         """
         Get GitHub access token, refreshing if necessary.
-        
+
         First checks for GH_COPILOT_KEY environment variable,
         then falls back to the LLM key storage.
         """
@@ -156,7 +160,7 @@ class GitHubCopilotAuthenticator:
         env_token = os.environ.get("GH_COPILOT_KEY")
         if env_token and env_token.strip():
             return env_token.strip()
-            
+
         # Try to read existing token from LLM key storage
         try:
             access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
@@ -174,7 +178,9 @@ class GitHubCopilotAuthenticator:
                     llm.set_key("github-copilot", self.ACCESS_TOKEN_KEY, access_token)
                 except TypeError:
                     # Handle older LLM versions
-                    print("Warning: Unable to save token to LLM key storage (incompatible LLM version)")
+                    print(
+                        "Warning: Unable to save token to LLM key storage (incompatible LLM version)"
+                    )
                 except Exception as e:
                     print(f"Error saving access token to LLM key storage: {str(e)}")
                 return access_token
@@ -204,9 +210,11 @@ class GitHubCopilotAuthenticator:
             access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
         except (TypeError, Exception):
             access_token = None
-            
+
         if not access_token and not os.environ.get("GH_COPILOT_KEY"):
-            raise Exception("GitHub Copilot authentication required. Run 'llm github-copilot auth login' first.")
+            raise Exception(
+                "GitHub Copilot authentication required. Run 'llm github-copilot auth login' first."
+            )
 
         try:
             api_key_info = self._refresh_api_key()
@@ -534,7 +542,13 @@ class GitHubCopilot(llm.Model):
         # Use the mapping or default to gpt-4o
         return mappings.get(model, self.DEFAULT_MODEL_MAPPING)
 
-    def _non_streaming_request(self, prompt: llm.Prompt, headers: dict[str,str], payload: dict[str,Any], model_name: str):
+    def _non_streaming_request(
+        self,
+        prompt: llm.Prompt,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+        model_name: str,
+    ):
         try:
             # Ensure stream is set to false
             payload["stream"] = False
@@ -596,7 +610,13 @@ class GitHubCopilot(llm.Model):
             print(error_text)
             yield error_text
 
-    def execute(self, prompt: llm.Prompt, stream: bool, response: llm.Response, conversation: Optional[llm.Conversation]) -> Generator[str, None, None]:
+    def execute(
+        self,
+        prompt: llm.Prompt,
+        stream: bool,
+        response: llm.Response,
+        conversation: Optional[llm.Conversation],
+    ) -> Generator[str, None, None]:
         # Get API key
         try:
             api_key = self.authenticator.get_api_key()
@@ -689,7 +709,13 @@ class GitHubCopilot(llm.Model):
 
         return messages
 
-    def _handle_streaming_request(self, prompt: llm.Prompt, headers: dict[str,str], payload: dict[str,Any], model_name: str) -> Generator[str, None, None]:
+    def _handle_streaming_request(
+        self,
+        prompt: llm.Prompt,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+        model_name: str,
+    ) -> Generator[str, None, None]:
         try:
             with httpx.Client() as client:
                 with client.stream(
@@ -781,65 +807,81 @@ def register_commands(cli):
         pass
 
     @auth_group.command(name="login")
-    @click.option("-f", "--force", is_flag=True, help="Force login even if already authenticated")
+    @click.option(
+        "-f", "--force", is_flag=True, help="Force login even if already authenticated"
+    )
     def login_command(force):
         """
         Authenticate with GitHub Copilot to generate a new access token.
         """
         authenticator = GitHubCopilotAuthenticator()
-        
+
         # Check if already authenticated and not forcing re-login
         if not force and authenticator.has_valid_credentials():
             click.echo("Valid GitHub Copilot authentication already exists.")
             click.echo("Use --force to re-authenticate if needed.")
-            click.echo("Run 'llm github-copilot auth status' to see current authentication details.")
+            click.echo(
+                "Run 'llm github-copilot auth status' to see current authentication details."
+            )
             return 0
-            
+
         try:
             # Check if using environment variable
             using_env_var = bool(os.environ.get("GH_COPILOT_KEY"))
-            
+
             if using_env_var:
                 # Using environment variable for access token
                 access_token = os.environ.get("GH_COPILOT_KEY").strip()
-                click.echo(f"Access token: {access_token} (from environment variable GH_COPILOT_KEY)")
+                click.echo(
+                    f"Access token: {access_token} (from environment variable GH_COPILOT_KEY)"
+                )
             else:
                 # Start the login process
-                click.echo("Starting GitHub Copilot authentication to generate a new access token...")
+                click.echo(
+                    "Starting GitHub Copilot authentication to generate a new access token..."
+                )
                 access_token = authenticator._login()
-                
+
                 # Save the access token to LLM key storage
                 try:
-                    llm.set_key("github-copilot", authenticator.ACCESS_TOKEN_KEY, access_token)
+                    llm.set_key(
+                        "github-copilot", authenticator.ACCESS_TOKEN_KEY, access_token
+                    )
                     click.echo(f"Access token: {access_token} (from LLM key storage)")
                 except TypeError:
-                    click.echo("Warning: Unable to save token to LLM key storage (incompatible LLM version)")
-            
+                    click.echo(
+                        "Warning: Unable to save token to LLM key storage (incompatible LLM version)"
+                    )
+
             # Get the API key
             click.echo("Fetching API key...")
             api_key_info = authenticator._refresh_api_key()
-            authenticator.api_key_file.write_text(json.dumps(api_key_info), encoding="utf-8")
+            authenticator.api_key_file.write_text(
+                json.dumps(api_key_info), encoding="utf-8"
+            )
             authenticator.api_key_file.chmod(0o600)
-            
+
             # Display API key information in the same format as status
             expires_at = api_key_info.get("expires_at", 0)
             if expires_at > 0:
-                expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                expiry_date = datetime.fromtimestamp(expires_at).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
                 click.echo(f"API key expires: {expiry_date}")
                 api_key = api_key_info.get("token", "")
                 click.echo(f"API key: {api_key}")
-            
+
             click.echo("GitHub Copilot authentication completed successfully!")
-            
+
             # Fetch available models
             click.echo("Fetching available models...")
             models = fetch_available_models(authenticator)
             click.echo(f"Available models: {', '.join(models)}")
-            
+
         except Exception as e:
             click.echo(f"Error during authentication: {str(e)}", err=True)
             return 1
-        
+
         return 0
 
     @auth_group.command(name="status")
@@ -848,49 +890,59 @@ def register_commands(cli):
         Check GitHub Copilot authentication status.
         """
         authenticator = GitHubCopilotAuthenticator()
-        
+
         if authenticator.has_valid_credentials():
             click.echo("GitHub Copilot authentication: ✓ Authenticated")
-            
+
             # Display the access token and its source
             try:
                 # Check environment variable first
                 env_token = os.environ.get("GH_COPILOT_KEY")
                 if env_token and env_token.strip():
-                    click.echo(f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)")
+                    click.echo(
+                        f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)"
+                    )
                 else:
                     # Check LLM key storage
                     try:
-                        access_token = llm.get_key("github-copilot", authenticator.ACCESS_TOKEN_KEY)
+                        access_token = llm.get_key(
+                            "github-copilot", authenticator.ACCESS_TOKEN_KEY
+                        )
                         if access_token:
-                            click.echo(f"Access token: {access_token} (from LLM key storage)")
+                            click.echo(
+                                f"Access token: {access_token} (from LLM key storage)"
+                            )
                         else:
                             click.echo("Access token: Not found")
                     except TypeError:
                         # Fallback for older LLM versions
-                        click.echo("Access token: Unable to retrieve from LLM key storage (incompatible LLM version)")
+                        click.echo(
+                            "Access token: Unable to retrieve from LLM key storage (incompatible LLM version)"
+                        )
             except Exception as e:
                 click.echo(f"Error retrieving access token: {str(e)}")
-            
+
             # Check if we have a valid API key
             try:
                 api_key_info = json.loads(authenticator.api_key_file.read_text())
                 expires_at = api_key_info.get("expires_at", 0)
                 if expires_at > datetime.now().timestamp():
-                    expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                    expiry_date = datetime.fromtimestamp(expires_at).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
                     click.echo(f"API key expires: {expiry_date}")
                     api_key = api_key_info.get("token", "")
                     click.echo(f"API key: {api_key}")
                 else:
-                    click.echo("API key has expired. Run 'llm github-copilot auth login' to refresh.")
+                    click.echo("API key:  <<expired, will refresh on next request>>")
             except (FileNotFoundError, json.JSONDecodeError, KeyError):
                 click.echo("API key status: Not found or invalid")
-                
+
             # Don't display available models in status command
         else:
             click.echo("GitHub Copilot authentication: ✗ Not authenticated")
             click.echo("Run 'llm github-copilot auth login' to authenticate.")
-        
+
         return 0
 
     @auth_group.command(name="refresh")
@@ -899,53 +951,63 @@ def register_commands(cli):
         Force refresh the GitHub Copilot API key.
         """
         authenticator = GitHubCopilotAuthenticator()
-        
+
         try:
             # Check if we have an access token
-            if not authenticator.access_token_file.exists() and not os.environ.get("GH_COPILOT_KEY"):
-                click.echo("No access token found. Run 'llm github-copilot auth login' first.")
+            if not authenticator.access_token_file.exists() and not os.environ.get(
+                "GH_COPILOT_KEY"
+            ):
+                click.echo(
+                    "No access token found. Run 'llm github-copilot auth login' first."
+                )
                 return 1
-                
+
             # Force refresh the API key
             click.echo("Refreshing API key...")
             api_key_info = authenticator._refresh_api_key()
-            authenticator.api_key_file.write_text(json.dumps(api_key_info), encoding="utf-8")
+            authenticator.api_key_file.write_text(
+                json.dumps(api_key_info), encoding="utf-8"
+            )
             authenticator.api_key_file.chmod(0o600)
-            
+
             # Show expiry information
             expires_at = api_key_info.get("expires_at", 0)
             if expires_at > 0:
-                expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                expiry_date = datetime.fromtimestamp(expires_at).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
                 click.echo(f"API key refreshed successfully. Expires: {expiry_date}")
             else:
                 click.echo("API key refreshed successfully.")
-                
+
             return 0
         except Exception as e:
             click.echo(f"Error refreshing API key: {str(e)}", err=True)
             return 1
-    
+
     @auth_group.command(name="logout")
     def logout_command():
         """
         Remove GitHub Copilot authentication credentials.
         """
         authenticator = GitHubCopilotAuthenticator()
-        
+
         # Remove access token from LLM key storage
         try:
             if llm.get_key("github-copilot", authenticator.ACCESS_TOKEN_KEY):
                 llm.delete_key("github-copilot", authenticator.ACCESS_TOKEN_KEY)
                 click.echo("Access token removed from LLM key storage.")
         except TypeError:
-            click.echo("Warning: Unable to access LLM key storage (incompatible LLM version)")
+            click.echo(
+                "Warning: Unable to access LLM key storage (incompatible LLM version)"
+            )
         except Exception as e:
             click.echo(f"Error removing access token: {str(e)}")
-        
+
         # Remove API key
         if authenticator.api_key_file.exists():
             authenticator.api_key_file.unlink()
             click.echo("API key removed.")
-            
+
         click.echo("GitHub Copilot logout completed successfully.")
         return 0

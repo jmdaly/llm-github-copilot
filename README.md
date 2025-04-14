@@ -24,6 +24,7 @@ Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 co
 ### Auth Command Help
 
 ```
+
 $ llm github-copilot auth --help
 Usage: llm github-copilot auth [OPTIONS] COMMAND [ARGS]...
 
@@ -37,6 +38,7 @@ Commands:
   logout   Remove GitHub Copilot authentication credentials.
   refresh  Force refresh the GitHub Copilot API key.
   status   Check GitHub Copilot authentication status.
+
 ```
 
 ### Authentication Login

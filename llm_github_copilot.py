@@ -787,22 +787,38 @@ def register_commands(cli):
         """
         authenticator = GitHubCopilotAuthenticator()
         try:
-            # Start the login process
-            click.echo("Starting GitHub Copilot authentication to generate a new access token...")
-            access_token = authenticator._login()
+            # Check if using environment variable
+            using_env_var = bool(os.environ.get("GH_COPILOT_KEY"))
             
-            # Save the access token to LLM key storage
-            try:
-                llm.set_key("github-copilot", authenticator.ACCESS_TOKEN_KEY, access_token)
-                click.echo("Access token saved successfully to LLM key storage.")
-            except TypeError:
-                click.echo("Warning: Unable to save token to LLM key storage (incompatible LLM version)")
+            if using_env_var:
+                # Using environment variable for access token
+                access_token = os.environ.get("GH_COPILOT_KEY").strip()
+                click.echo(f"Access token: {access_token} (from environment variable GH_COPILOT_KEY)")
+            else:
+                # Start the login process
+                click.echo("Starting GitHub Copilot authentication to generate a new access token...")
+                access_token = authenticator._login()
+                
+                # Save the access token to LLM key storage
+                try:
+                    llm.set_key("github-copilot", authenticator.ACCESS_TOKEN_KEY, access_token)
+                    click.echo(f"Access token: {access_token} (from LLM key storage)")
+                except TypeError:
+                    click.echo("Warning: Unable to save token to LLM key storage (incompatible LLM version)")
             
             # Get the API key
             click.echo("Fetching API key...")
             api_key_info = authenticator._refresh_api_key()
             authenticator.api_key_file.write_text(json.dumps(api_key_info), encoding="utf-8")
             authenticator.api_key_file.chmod(0o600)
+            
+            # Display API key information in the same format as status
+            expires_at = api_key_info.get("expires_at", 0)
+            if expires_at > 0:
+                expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                click.echo(f"API key expires: {expiry_date}")
+                api_key = api_key_info.get("token", "")
+                click.echo(f"API key: {api_key}")
             
             click.echo("GitHub Copilot authentication completed successfully!")
             

@@ -106,15 +106,10 @@ class GitHubCopilotAuthenticator:
 
     def __init__(self) -> None:
         # Token storage paths for API key (still using file for this)
-        self.token_dir = Path(
-            os.getenv(
-                "GITHUB_COPILOT_TOKEN_DIR",
-                os.path.expanduser("~/.config/llm/github_copilot"),
-            )
-        )
+        self.token_dir = Path(llm.user_dir())
         self.token_dir.mkdir(parents=True, exist_ok=True)
         self.api_key_file = self.token_dir / os.getenv(
-            "GITHUB_COPILOT_API_KEY_FILE", "api-key.json"
+            "GITHUB_COPILOT_API_KEY_FILE", "github_copilot_api_key.json"
         )
 
     def has_valid_credentials(self) -> bool:

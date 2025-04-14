@@ -125,9 +125,12 @@ class GitHubCopilotAuthenticator:
                     return True
                     
             # Check if we have a valid access token that we can use to get an API key
-            access_token = llm.get_key(self.ACCESS_TOKEN_KEY)
-            if access_token:
-                return True
+            try:
+                access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
+                if access_token:
+                    return True
+            except (TypeError, Exception):
+                pass
                 
             return False
         except (FileNotFoundError, json.JSONDecodeError, KeyError):
@@ -155,9 +158,12 @@ class GitHubCopilotAuthenticator:
             return env_token.strip()
             
         # Try to read existing token from LLM key storage
-        access_token = llm.get_key(self.ACCESS_TOKEN_KEY)
-        if access_token:
-            return access_token
+        try:
+            access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
+            if access_token:
+                return access_token
+        except (TypeError, Exception):
+            pass
 
         # No valid token found, need to login
         for attempt in range(self.MAX_LOGIN_ATTEMPTS):
@@ -165,7 +171,10 @@ class GitHubCopilotAuthenticator:
                 access_token = self._login()
                 # Save the new token in LLM key storage
                 try:
-                    llm.set_key(self.ACCESS_TOKEN_KEY, access_token)
+                    llm.set_key("github-copilot", self.ACCESS_TOKEN_KEY, access_token)
+                except TypeError:
+                    # Handle older LLM versions
+                    print("Warning: Unable to save token to LLM key storage (incompatible LLM version)")
                 except Exception as e:
                     print(f"Error saving access token to LLM key storage: {str(e)}")
                 return access_token
@@ -191,7 +200,11 @@ class GitHubCopilotAuthenticator:
             pass
 
         # If we don't have a valid API key, check if we need to authenticate first
-        access_token = llm.get_key(self.ACCESS_TOKEN_KEY)
+        try:
+            access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
+        except (TypeError, Exception):
+            access_token = None
+            
         if not access_token and not os.environ.get("GH_COPILOT_KEY"):
             raise Exception("GitHub Copilot authentication required. Run 'llm github-copilot auth login' first.")
 
@@ -779,8 +792,11 @@ def register_commands(cli):
             access_token = authenticator._login()
             
             # Save the access token to LLM key storage
-            llm.set_key(authenticator.ACCESS_TOKEN_KEY, access_token)
-            click.echo("Access token saved successfully to LLM key storage.")
+            try:
+                llm.set_key("github-copilot", authenticator.ACCESS_TOKEN_KEY, access_token)
+                click.echo("Access token saved successfully to LLM key storage.")
+            except TypeError:
+                click.echo("Warning: Unable to save token to LLM key storage (incompatible LLM version)")
             
             # Get the API key
             click.echo("Fetching API key...")
@@ -819,11 +835,15 @@ def register_commands(cli):
                     click.echo(f"Access token: {env_token.strip()} (from environment variable GH_COPILOT_KEY)")
                 else:
                     # Check LLM key storage
-                    access_token = llm.get_key(authenticator.ACCESS_TOKEN_KEY)
-                    if access_token:
-                        click.echo(f"Access token: {access_token} (from LLM key storage)")
-                    else:
-                        click.echo("Access token: Not found")
+                    try:
+                        access_token = llm.get_key("github-copilot", authenticator.ACCESS_TOKEN_KEY)
+                        if access_token:
+                            click.echo(f"Access token: {access_token} (from LLM key storage)")
+                        else:
+                            click.echo("Access token: Not found")
+                    except TypeError:
+                        # Fallback for older LLM versions
+                        click.echo("Access token: Unable to retrieve from LLM key storage (incompatible LLM version)")
             except Exception as e:
                 click.echo(f"Error retrieving access token: {str(e)}")
             
@@ -892,9 +912,11 @@ def register_commands(cli):
         
         # Remove access token from LLM key storage
         try:
-            if llm.get_key(authenticator.ACCESS_TOKEN_KEY):
-                llm.delete_key(authenticator.ACCESS_TOKEN_KEY)
+            if llm.get_key("github-copilot", authenticator.ACCESS_TOKEN_KEY):
+                llm.delete_key("github-copilot", authenticator.ACCESS_TOKEN_KEY)
                 click.echo("Access token removed from LLM key storage.")
+        except TypeError:
+            click.echo("Warning: Unable to access LLM key storage (incompatible LLM version)")
         except Exception as e:
             click.echo(f"Error removing access token: {str(e)}")
         

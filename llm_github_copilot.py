@@ -880,7 +880,8 @@ def register_commands(cli):
         return 0
 
     @auth_group.command(name="status")
-    def status_command():
+    @click.option("-v", "--verbose", is_flag=True, help="Show the full API key")
+    def status_command(verbose):
         """
         Check GitHub Copilot authentication status.
         """
@@ -926,8 +927,11 @@ def register_commands(cli):
                         "%Y-%m-%d %H:%M:%S"
                     )
                     click.echo(f"API key expires: {expiry_date}")
-                    api_key = api_key_info.get("token", "")
-                    click.echo(f"API key: {api_key}")
+                    
+                    # Only show the API key in verbose mode
+                    if verbose:
+                        api_key = api_key_info.get("token", "")
+                        click.echo(f"API key: {api_key}")
                 else:
                     click.echo("API key:  <<expired, will refresh on next request>>")
             except (FileNotFoundError, json.JSONDecodeError, KeyError):

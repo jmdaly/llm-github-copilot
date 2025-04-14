@@ -949,9 +949,12 @@ def register_commands(cli):
 
         try:
             # Check if we have an access token
-            if not authenticator.access_token_file.exists() and not os.environ.get(
-                "GH_COPILOT_KEY"
-            ):
+            try:
+                access_token = llm.get_key("github-copilot", authenticator.ACCESS_TOKEN_KEY)
+            except (TypeError, Exception):
+                access_token = None
+                
+            if not access_token and not os.environ.get("GH_COPILOT_KEY"):
                 click.echo(
                     "No access token found. Run 'llm github-copilot auth login' first."
                 )

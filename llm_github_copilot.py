@@ -11,6 +11,33 @@ import click
 import secrets
 
 
+def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
+    """Helper function to fetch raw model data from the API."""
+    try:
+        api_key = authenticator.get_api_key()
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "editor-version": "vscode/1.85.1",
+        }
+        response = httpx.get(
+            "https://api.githubcopilot.com/models", headers=headers, timeout=30
+        )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        print(f"Error fetching models data (HTTP {e.response.status_code}): {e.response.text}")
+        raise
+    except httpx.RequestError as e:
+        print(f"Error fetching models data (Request Error): {str(e)}")
+        raise
+    except Exception as e:
+        # Catch potential errors from get_api_key() as well
+        print(f"Error fetching models data: {str(e)}")
+        raise
+
+
 @llm.hookimpl
 def register_models(register):
     """Register all GitHub Copilot models with the LLM CLI tool."""
@@ -41,38 +68,22 @@ def register_models(register):
 
 
 def fetch_available_models(authenticator: "GitHubCopilotAuthenticator") -> set[str]:
+    """Fetches available model IDs from the GitHub Copilot API."""
+    model_ids = {"github-copilot"}  # Always include default model
     try:
-        # Get API key
-        api_key = authenticator.get_api_key()
-
-        # Prepare headers
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "editor-version": "vscode/1.85.1",
-        }
-
-        # Make request to get models
-        response = httpx.get(
-            "https://api.githubcopilot.com/models", headers=headers, timeout=30
-        )
-        response.raise_for_status()
-
-        # Parse response
-        models_data = response.json()
-        model_ids = set(["github-copilot"])  # Always include default model
+        models_data = _fetch_models_data(authenticator)
 
         # Process models from response - models are in the "data" field
         for model in models_data.get("data", []):
             model_id = model.get("id")
-            if model_id and model_id != "gpt-4o":  # Skip the default model ID
+            # Skip the model ID that the base 'github-copilot' maps to by default
+            if model_id and model_id != GitHubCopilot.DEFAULT_MODEL_MAPPING:
                 model_ids.add(f"github-copilot/{model_id}")
 
         return model_ids
 
     except Exception as e:
-        print(f"Error fetching models: {str(e)}")
+        # Error is logged within _fetch_models_data
         # Return a minimal set of known models as fallback
         return {"github-copilot"}
 
@@ -427,25 +438,8 @@ class GitHubCopilot(llm.Model):
             try:
                 # Create a temporary authenticator to fetch models
                 authenticator = GitHubCopilotAuthenticator()
-                api_key = authenticator.get_api_key()
+                models_data = _fetch_models_data(authenticator) # Use helper
 
-                # Prepare headers
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "editor-version": "vscode/1.85.1",
-                    "editor-plugin-version": "copilot/1.155.0",
-                }
-
-                # Make request to get models
-                response = httpx.get(
-                    "https://api.githubcopilot.com/models", headers=headers, timeout=30
-                )
-                response.raise_for_status()
-
-                # Parse response
-                models_data = response.json()
                 mappings = {"github-copilot": cls.DEFAULT_MODEL_MAPPING}
 
                 # Process models from response - models are in the "data" field
@@ -458,10 +452,10 @@ class GitHubCopilot(llm.Model):
                 cls._model_mappings = mappings
 
             except Exception as e:
-                print(f"Error fetching model mappings: {str(e)}")
+                # Error logged by _fetch_models_data
                 # Fallback to basic mappings
                 cls._model_mappings = {
-                    "github-copilot": "gpt-4o",
+                    "github-copilot": cls.DEFAULT_MODEL_MAPPING,
                 }
 
         return cls._model_mappings
@@ -472,24 +466,8 @@ class GitHubCopilot(llm.Model):
             try:
                 # Create a temporary authenticator to fetch models
                 authenticator = GitHubCopilotAuthenticator()
-                api_key = authenticator.get_api_key()
+                models_data = _fetch_models_data(authenticator) # Use helper
 
-                # Prepare headers
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                    "editor-version": "vscode/1.85.1",
-                }
-
-                # Make request to get models
-                response = httpx.get(
-                    "https://api.githubcopilot.com/models", headers=headers, timeout=30
-                )
-                response.raise_for_status()
-
-                # Parse response
-                models_data = response.json()
                 streaming_models = []
 
                 # Process models from response - models are in the "data" field
@@ -502,14 +480,15 @@ class GitHubCopilot(llm.Model):
                     if supports.get("streaming", False) and model_id:
                         streaming_models.append(model_id)
 
-                # Always include default model
+                # Always include default model mapping value
                 if cls.DEFAULT_MODEL_MAPPING not in streaming_models:
                     streaming_models.append(cls.DEFAULT_MODEL_MAPPING)
 
                 cls._streaming_models = streaming_models
 
             except Exception as e:
-                print(f"Error fetching streaming models: {str(e)}")
+                # Error logged by _fetch_models_data
+                print(f"Failed to process streaming models data: {str(e)}")
                 # Fallback to assuming all models support streaming
                 mappings = cls.get_model_mappings()
                 cls._streaming_models = list(mappings.values())

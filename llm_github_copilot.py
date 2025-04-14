@@ -175,30 +175,10 @@ class GitHubCopilotAuthenticator:
         except (TypeError, Exception):
             pass
 
-        # No valid token found, need to login
-        for attempt in range(self.MAX_LOGIN_ATTEMPTS):
-            try:
-                access_token = self._login()
-                # Save the new token in LLM key storage
-                try:
-                    llm.set_key("github-copilot", self.ACCESS_TOKEN_KEY, access_token)
-                except TypeError:
-                    # Handle older LLM versions
-                    print(
-                        "Warning: Unable to save token to LLM key storage (incompatible LLM version)"
-                    )
-                except Exception as e:
-                    print(f"Error saving access token to LLM key storage: {str(e)}")
-                return access_token
-            except Exception as e:
-                print(
-                    f"Login attempt {attempt + 1}/{self.MAX_LOGIN_ATTEMPTS} failed: {str(e)}"
-                )
-                if attempt == self.MAX_LOGIN_ATTEMPTS - 1:  # Last attempt
-                    raise Exception(
-                        f"Failed to get access token after {self.MAX_LOGIN_ATTEMPTS} attempts"
-                    )
-                continue
+        # No valid token found, inform user they need to authenticate
+        raise Exception(
+            "GitHub Copilot authentication required. Run 'llm github-copilot auth login' to authenticate or set the GH_COPILOT_KEY environment variable."
+        )
 
     def get_api_key(self) -> str:
         """

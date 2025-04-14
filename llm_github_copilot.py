@@ -781,11 +781,20 @@ def register_commands(cli):
         pass
 
     @auth_group.command(name="login")
-    def login_command():
+    @click.option("-f", "--force", is_flag=True, help="Force login even if already authenticated")
+    def login_command(force):
         """
         Authenticate with GitHub Copilot to generate a new access token.
         """
         authenticator = GitHubCopilotAuthenticator()
+        
+        # Check if already authenticated and not forcing re-login
+        if not force and authenticator.has_valid_credentials():
+            click.echo("Valid GitHub Copilot authentication already exists.")
+            click.echo("Use --force to re-authenticate if needed.")
+            click.echo("\nCurrent authentication status:")
+            return status_command()
+            
         try:
             # Check if using environment variable
             using_env_var = bool(os.environ.get("GH_COPILOT_KEY"))

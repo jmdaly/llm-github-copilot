@@ -79,14 +79,21 @@ class TestAuthLogin:
             @click.option("-f", "--force", is_flag=True)
             def mock_login_command(force):
                 mock_authenticator.has_valid_credentials()
-                if os.environ.get("GH_COPILOT_TOKEN"):
-                    click.echo("Not possible to initiate login with environment variable GH_COPILOT_TOKEN set")
+                env_var_used = None
+                for env_var in ["GH_COPILOT_TOKEN", "GITHUB_COPILOT_TOKEN"]:
+                    if os.environ.get(env_var):
+                        env_var_used = env_var
+                        break
+                        
+                if env_var_used:
+                    click.echo(f"Not possible to initiate login with environment variable {env_var_used} set")
             
             # Run the command
             result = cli_runner.invoke(mock_login_command)
             
             # Check the output
-            assert "Not possible to initiate login with environment variable GH_COPILOT_TOKEN set" in result.output
+            assert "Not possible to initiate login with environment variable" in result.output
+            assert "GH_COPILOT_TOKEN" in result.output
     
     def test_login_success(self, cli_runner, mock_authenticator):
         """Test successful login."""
@@ -216,7 +223,7 @@ class TestAuthRefresh:
                 except (TypeError, Exception):
                     access_token = None
                 
-                if not access_token and not os.environ.get("GH_COPILOT_TOKEN"):
+                if not access_token and not (os.environ.get("GH_COPILOT_TOKEN") or os.environ.get("GITHUB_COPILOT_TOKEN")):
                     click.echo("No access token found. Run 'llm github-copilot auth login' first.")
                     return 1
                 return 0
@@ -250,7 +257,7 @@ class TestAuthRefresh:
                 except (TypeError, Exception):
                     access_token = None
                 
-                if access_token or os.environ.get("GH_COPILOT_TOKEN"):
+                if access_token or os.environ.get("GH_COPILOT_TOKEN") or os.environ.get("GITHUB_COPILOT_TOKEN"):
                     click.echo("Refreshing API key...")
                     api_key_info = mock_authenticator._refresh_api_key()
                     expires_at = api_key_info.get("expires_at", 0)

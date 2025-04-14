@@ -36,6 +36,37 @@ llm github-copilot auth refresh
 llm github-copilot auth logout
 ```
 
+### Auth Command Help
+
+```
+$ llm github-copilot auth --help
+Usage: llm github-copilot auth [OPTIONS] COMMAND [ARGS]...
+
+  Manage GitHub Copilot authentication.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  login    Authenticate with GitHub Copilot to generate a new access token.
+  logout   Remove GitHub Copilot authentication credentials.
+  refresh  Force refresh the GitHub Copilot API key.
+  status   Check GitHub Copilot authentication status.
+```
+
+### Status Command Output
+
+```
+$ llm github-copilot auth status
+GitHub Copilot authentication: ✓ Authenticated
+
+$ llm github-copilot auth status --verbose
+GitHub Copilot authentication: ✓ Authenticated
+Access token: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (from LLM key storage)
+API key expires: 2025-04-14 12:34:56
+API key: gcp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
 Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 completions and 50 chat requests per month.
 
 

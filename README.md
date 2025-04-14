@@ -20,6 +20,22 @@ llm install llm-github-copilot
 
 This plugin uses GitHub's device code authentication flow. When you first use the plugin, it will prompt you to visit GitHub and enter a code to authenticate.
 
+You can also manage authentication using the CLI:
+
+```bash
+# Login to GitHub Copilot
+llm github-copilot auth login
+
+# Check authentication status
+llm github-copilot auth status
+
+# Force refresh the API key
+llm github-copilot auth refresh
+
+# Logout and remove credentials
+llm github-copilot auth logout
+```
+
 Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 completions and 50 chat requests per month.
 
 

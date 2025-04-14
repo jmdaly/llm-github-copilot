@@ -792,9 +792,7 @@ def register_commands(cli):
         if not force and authenticator.has_valid_credentials():
             click.echo("Valid GitHub Copilot authentication already exists.")
             click.echo("Use --force to re-authenticate if needed.")
-            click.echo("\nCurrent authentication status:")
-            # Execute the status command directly
-            status_command()
+            click.echo("Run 'llm github-copilot auth status' to see current authentication details.")
             return 0
             
         try:

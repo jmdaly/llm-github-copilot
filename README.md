@@ -17,7 +17,7 @@ llm install llm-github-copilot
 
 ## Authentication
 
-This plugin uses GitHub's device code authentication flow to obtain the initial access_token.   This access_token is what is used to initiate and obtain an api_key that is used for communication with the GitHub Copilot API.  This api_key is automatically obtained and refreshed as needed using the access_token.  The access_token is obtained from the LLM key storage or via the environment variable `GH_COPILOT_KEY`.
+This plugin uses GitHub's device code authentication flow to obtain the initial access_token.   This access_token is what is used to initiate and obtain an api_key that is used for communication with the GitHub Copilot API.  This api_key is automatically obtained and refreshed as needed using the access_token.  The access_token is obtained from the LLM key storage or via the environment variable `GH_COPILOT_TOKEN` or `GITHUB_COPILOT_TOKEN`
 
 Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 completions and 50 chat requests per month.
 

@@ -1269,64 +1269,8 @@ def register_commands(cli):
                         click.echo(f"- {model_id}")
                     return 1 # Indicate partial failure
 
-                click.echo("Registered GitHub Copilot models (verbose):")
-                model_mappings = GitHubCopilot.get_model_mappings()
-
-                for model_id in github_model_ids:
-                    click.echo(f"\nModel ID: {model_id}")
-                    # Find the corresponding API model name
-                    api_model_name = model_mappings.get(model_id)
-
-                    if api_model_name and api_model_name in api_models_info:
-                        model_info = api_models_info[api_model_name]
-                        click.echo(f"  API ID (id): {api_model_name}")
-                        click.echo(f"  Name: {model_info.get('name', 'N/A')}")
-                        click.echo(f"  Description: {model_info.get('description', 'N/A')}")
-
-                        capabilities = model_info.get('capabilities', {})
-                        supports = capabilities.get('supports', {})
-                        vision = capabilities.get('vision', {})
-                        tools = capabilities.get('tools', {})
-                        # Get limits directly from model_info
-                        limits = model_info.get('limits', {})
-
-                        click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use direct limits for context length
-                        click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
-                        click.echo(f"  Supports Schema: {supports.get('schema', False)}")
-                        click.echo(f"  Supports Tool Calls: {tools.get('supported', False)}")
-                        click.echo(f"  Supported Vision Media Types: {vision.get('supported_media_types', [])}")
-
-                        # Removed redundant printing of the full limits dict
-
-                    elif model_id == "github-copilot":
-                         # Special handling for the default alias
-                         default_api_name = GitHubCopilot.DEFAULT_MODEL_MAPPING
-                         click.echo(f"  (Default alias for: {default_api_name})")
-                         if default_api_name in api_models_info:
-                             model_info = api_models_info[default_api_name]
-                             click.echo(f"  API ID (id): {default_api_name}")
-                             click.echo(f"  Name: {model_info.get('name', 'N/A')}")
-                             click.echo(f"  Description: {model_info.get('description', 'N/A')}")
-
-                             capabilities = model_info.get('capabilities', {})
-                             supports = capabilities.get('supports', {})
-                             vision = capabilities.get('vision', {})
-                             tools = capabilities.get('tools', {})
-                             # Get limits directly from model_info
-                             limits = model_info.get('limits', {})
-
-                             click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use direct limits for context length
-                             click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
-                             click.echo(f"  Supports Schema: {supports.get('schema', False)}")
-                             click.echo(f"  Supports Tool Calls: {tools.get('supported', False)}")
-                             click.echo(f"  Supported Vision Media Types: {vision.get('supported_media_types', [])}")
-
-                             # Removed redundant printing of the full limits dict
-                         else:
-                             click.echo("  Details for default model not found in API response.")
-                    else:
-                        click.echo("  Details not found in current API response.")
-
+                # Print the raw JSON response, pretty-printed
+                click.echo(json.dumps(models_data, indent=2))
                 return 0
 
         except Exception as e:

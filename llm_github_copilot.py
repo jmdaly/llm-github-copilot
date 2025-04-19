@@ -88,35 +88,35 @@ def fetch_available_models(authenticator: "GitHubCopilotAuthenticator") -> set[s
     Fetches available model IDs from the GitHub Copilot API.
 
     This function retrieves the list of available models from the GitHub Copilot API
-    and formats them as LLM-compatible model IDs (e.g., "github-copilot/claude-3-7-sonnet").
+    and formats them as LLM-compatible model IDs (e.g., "github_copilot/claude-3-7-sonnet").
 
     Args:
         authenticator: The GitHubCopilotAuthenticator instance to use for authentication
 
     Returns:
-        set[str]: A set of available model IDs, always including at least "github-copilot"
+        set[str]: A set of available model IDs, always including at least "github_copilot"
 
     Note:
         If the API request fails, this function will return a minimal set containing
-        only the default "github-copilot" model ID.
+        only the default "github_copilot" model ID.
     """
-    model_ids = {"github-copilot"}  # Always include default model
+    model_ids = {"github_copilot"}  # Always include default model
     try:
         models_data = _fetch_models_data(authenticator)
 
         # Process models from response - models are in the "data" field
         for model in models_data.get("data", []):
             model_id = model.get("id")
-            # Skip the model ID that the base 'github-copilot' maps to by default
+            # Skip the model ID that the base 'github_copilot' maps to by default
             if model_id and model_id != GitHubCopilot.DEFAULT_MODEL_MAPPING:
-                model_ids.add(f"github-copilot/{model_id}")
+                model_ids.add(f"github_copilot/{model_id}")
 
         return model_ids
 
     except Exception as e:
         # Error is logged within _fetch_models_data
         # Return a minimal set of known models as fallback
-        return {"github-copilot"}
+        return {"github_copilot"}
 
 
 class GitHubCopilotAuthenticator:
@@ -177,7 +177,7 @@ class GitHubCopilotAuthenticator:
 
             # Check if we have a valid access token that we can use to get an API key
             try:
-                access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
+                access_token = llm.get_key("github_copilot", self.ACCESS_TOKEN_KEY)
                 if access_token:
                     return True
             except (TypeError, Exception):
@@ -222,7 +222,7 @@ class GitHubCopilotAuthenticator:
 
         # Try to read existing token from LLM key storage
         try:
-            access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
+            access_token = llm.get_key("github_copilot", self.ACCESS_TOKEN_KEY)
             if access_token:
                 return access_token
         except (TypeError, Exception):
@@ -230,7 +230,7 @@ class GitHubCopilotAuthenticator:
 
         # No valid token found, inform user they need to authenticate
         raise Exception(
-            "GitHub Copilot authentication required. Run 'llm github-copilot auth login' to authenticate or set the GH_COPILOT_KEY environment variable."
+            "GitHub Copilot authentication required. Run 'llm github_copilot auth login' to authenticate or set the GH_COPILOT_KEY environment variable."
         )
 
     def get_api_key(self) -> str:
@@ -246,7 +246,7 @@ class GitHubCopilotAuthenticator:
 
         # If we don't have a valid API key, check if we need to authenticate first
         try:
-            access_token = llm.get_key("github-copilot", self.ACCESS_TOKEN_KEY)
+            access_token = llm.get_key("github_copilot", self.ACCESS_TOKEN_KEY)
         except (TypeError, Exception):
             access_token = None
 
@@ -254,7 +254,7 @@ class GitHubCopilotAuthenticator:
             os.environ.get("GH_COPILOT_TOKEN") or os.environ.get("GITHUB_COPILOT_TOKEN")
         ):
             raise Exception(
-                "GitHub Copilot authentication required. Run 'llm github-copilot auth login' first."
+                "GitHub Copilot authentication required. Run 'llm github_copilot auth login' first."
             )
 
         try:
@@ -474,7 +474,7 @@ class GitHubCopilot(llm.Model):
     GitHub Copilot model implementation for LLM.
     """
 
-    model_id = "github-copilot"
+    model_id = "github_copilot"
     can_stream = True
 
     # API base URL
@@ -535,7 +535,7 @@ class GitHubCopilot(llm.Model):
         """
         Get model mappings, fetching them if not already cached.
 
-        This method retrieves the mapping between LLM model IDs (e.g., "github-copilot/gpt-4o")
+        This method retrieves the mapping between LLM model IDs (e.g., "github_copilot/gpt-4o")
         and the corresponding API model names (e.g., "gpt-4o"). It caches the results
         to avoid unnecessary API calls.
 
@@ -552,14 +552,14 @@ class GitHubCopilot(llm.Model):
                 authenticator = GitHubCopilotAuthenticator()
                 models_data = _fetch_models_data(authenticator)  # Use helper
 
-                mappings = {"github-copilot": cls.DEFAULT_MODEL_MAPPING}
+                mappings = {"github_copilot": cls.DEFAULT_MODEL_MAPPING}
 
                 # Process models from response - models are in the "data" field
                 for model in models_data.get("data", []):
                     model_id = model.get("id")
                     if model_id:
                         # Add all models, including the default one
-                        mappings[f"github-copilot/{model_id}"] = model_id
+                        mappings[f"github_copilot/{model_id}"] = model_id
 
                 cls._model_mappings = mappings
 
@@ -567,7 +567,7 @@ class GitHubCopilot(llm.Model):
                 # Error logged by _fetch_models_data
                 # Fallback to basic mappings
                 cls._model_mappings = {
-                    "github-copilot": cls.DEFAULT_MODEL_MAPPING,
+                    "github_copilot": cls.DEFAULT_MODEL_MAPPING,
                 }
 
         return cls._model_mappings
@@ -625,7 +625,7 @@ class GitHubCopilot(llm.Model):
         Convert model name to API-compatible format.
 
         Args:
-            model: The model identifier (e.g., "github-copilot/o1")
+            model: The model identifier (e.g., "github_copilot/o1")
 
         Returns:
             The API model name (e.g., "o1")
@@ -763,7 +763,7 @@ class GitHubCopilot(llm.Model):
         except Exception as e:
             error_message = str(e)
             if "authentication required" in error_message.lower():
-                yield "GitHub Copilot authentication required. Run 'llm github-copilot auth login' to authenticate."
+                yield "GitHub Copilot authentication required. Run 'llm github_copilot auth login' to authenticate."
             else:
                 yield f"Error getting GitHub Copilot API key: {error_message}"
             return
@@ -967,14 +967,14 @@ class GitHubCopilot(llm.Model):
 # LLM CLI command implementation
 @llm.hookimpl
 def register_commands(cli):
-    @cli.group(name="github-copilot")
+    @cli.group(name="github_copilot")
     def github_copilot_group():
         """
         Commands for managing GitHub Copilot plugin.
 
-        By default github-copilot will use the following in precedence order to obtain an access_token for communication :
+        By default github_copilot will use the following in precedence order to obtain an access_token for communication :
             $GH_COPILOT_KEY
-            llm keystore for github-copilot
+            llm keystore for github_copilot
         """
         pass
 
@@ -1001,7 +1001,7 @@ def register_commands(cli):
             click.echo("Valid GitHub Copilot authentication already exists.")
             click.echo("Use --force to re-authenticate if needed.")
             click.echo(
-                "Run 'llm github-copilot auth status' to see current authentication details."
+                "Run 'llm github_copilot auth status' to see current authentication details."
             )
             return 0
 
@@ -1033,7 +1033,7 @@ def register_commands(cli):
                 # Save the access token to LLM key storage
                 try:
                     llm.set_key(
-                        "github-copilot", authenticator.ACCESS_TOKEN_KEY, access_token
+                        "github_copilot", authenticator.ACCESS_TOKEN_KEY, access_token
                     )
                     click.echo(f"Access token: {access_token}")
                 except TypeError:
@@ -1101,7 +1101,7 @@ def register_commands(cli):
                         # Check LLM key storage
                         try:
                             access_token = llm.get_key(
-                                "github-copilot", authenticator.ACCESS_TOKEN_KEY
+                                "github_copilot", authenticator.ACCESS_TOKEN_KEY
                             )
                             if access_token:
                                 click.echo(
@@ -1144,7 +1144,7 @@ def register_commands(cli):
         else:
             click.echo("GitHub Copilot authentication: ✗ Not authenticated")
             click.echo(
-                "Run 'llm github-copilot auth login' to authenticate or set $GH_COPILOT_TOKEN or $GITHUB_COPILOT_TOKEN."
+                "Run 'llm github_copilot auth login' to authenticate or set $GH_COPILOT_TOKEN or $GITHUB_COPILOT_TOKEN."
             )
 
         return 0
@@ -1161,7 +1161,7 @@ def register_commands(cli):
             # Check if we have an access token
             try:
                 access_token = llm.get_key(
-                    "github-copilot", authenticator.ACCESS_TOKEN_KEY
+                    "github_copilot", authenticator.ACCESS_TOKEN_KEY
                 )
             except (TypeError, Exception):
                 access_token = None
@@ -1171,7 +1171,7 @@ def register_commands(cli):
                 or os.environ.get("GITHUB_COPILOT_TOKEN")
             ):
                 click.echo(
-                    "No access token found. Run 'llm github-copilot auth login' first."
+                    "No access token found. Run 'llm github_copilot auth login' first."
                 )
                 return 1
 
@@ -1214,8 +1214,8 @@ def register_commands(cli):
 
         # Remove access token from LLM key storage
         try:
-            if llm.get_key("github-copilot", authenticator.ACCESS_TOKEN_KEY):
-                llm.delete_key("github-copilot", authenticator.ACCESS_TOKEN_KEY)
+            if llm.get_key("github_copilot", authenticator.ACCESS_TOKEN_KEY):
+                llm.delete_key("github_copilot", authenticator.ACCESS_TOKEN_KEY)
                 click.echo("Access token removed from LLM key storage.")
         except TypeError:
             click.echo(
@@ -1233,10 +1233,10 @@ def register_commands(cli):
         return 0
 
     @github_copilot_group.command(name="models")
-    @click.option("-v", "--verbose", is_flag=True, help="Show detailed model information")
     @click.option(
-        "--raw", is_flag=True, help="Show raw model details from API (JSON)"
+        "-v", "--verbose", is_flag=True, help="Show detailed model information"
     )
+    @click.option("--raw", is_flag=True, help="Show raw model details from API (JSON)")
     def models_command(verbose, raw):
         """
         List registered GitHub Copilot models.
@@ -1254,7 +1254,7 @@ def register_commands(cli):
                 [
                     model.model_id
                     for model in registered_llm_models
-                    if model.model_id.startswith("github-copilot")
+                    if model.model_id.startswith("github_copilot")
                 ]
             )
 
@@ -1266,7 +1266,7 @@ def register_commands(cli):
             if not verbose and not raw:
                 click.echo("Registered GitHub Copilot models:")
                 for model_id in github_model_ids:
-                    click.echo(model_id) # Removed leading "- "
+                    click.echo(model_id)  # Removed leading "- "
                 return 0
 
             # Fetch data if verbose or raw
@@ -1276,7 +1276,7 @@ def register_commands(cli):
                     "Authentication required for detailed model information.", err=True
                 )
                 click.echo(
-                    "Run 'llm github-copilot auth login' or set $GH_COPILOT_TOKEN/$GITHUB_COPILOT_TOKEN.",
+                    "Run 'llm github_copilot auth login' or set $GH_COPILOT_TOKEN/$GITHUB_COPILOT_TOKEN.",
                     err=True,
                 )
                 return 1
@@ -1324,7 +1324,7 @@ def register_commands(cli):
                         # Extract details
                         context_length = limits.get("max_context_window_tokens", "N/A")
                         family = capabilities.get("family", "N/A")  # Get family
-                    elif model_id == "github-copilot":  # Handle default alias
+                    elif model_id == "github_copilot":  # Handle default alias
                         default_api_name = GitHubCopilot.DEFAULT_MODEL_MAPPING
                         if default_api_name in api_models_info:
                             model_info = api_models_info[default_api_name]

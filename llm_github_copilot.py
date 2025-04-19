@@ -1226,11 +1226,17 @@ def register_commands(cli):
         return 0
 
     @github_copilot_group.command(name="models")
+    @click.option("-v", "--verbose", is_flag=True, help="Show model ID and vendor")
     @click.option("-x", "--extended", is_flag=True, help="Show extended model details (YAML)")
-    def models_command(extended):
+    def models_command(verbose, extended):
         """
-        List registered GitHub Copilot models. Use -x for extended details.
+        List registered GitHub Copilot models.
+        Use -v for vendor info, -x for extended details (YAML).
         """
+        if verbose and extended:
+            click.echo("Error: Cannot use both -v and -x flags simultaneously.", err=True)
+            return 1
+
         try:
             registered_llm_models = llm.get_models()
             github_model_ids = sorted([

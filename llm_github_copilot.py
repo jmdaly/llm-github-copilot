@@ -9,6 +9,7 @@ from typing import Optional, Any, Generator, List
 from pydantic import Field, field_validator
 import click
 import secrets
+import yaml
 
 
 def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
@@ -1269,8 +1270,8 @@ def register_commands(cli):
                         click.echo(f"- {model_id}")
                     return 1 # Indicate partial failure
 
-                # Print the raw JSON response, pretty-printed
-                click.echo(json.dumps(models_data, indent=2))
+                # Print the raw YAML response, pretty-printed
+                click.echo(yaml.dump(models_data, indent=2, sort_keys=False))
                 return 0
 
         except Exception as e:

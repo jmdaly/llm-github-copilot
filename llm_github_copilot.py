@@ -1226,10 +1226,10 @@ def register_commands(cli):
         return 0
 
     @github_copilot_group.command(name="models")
-    @click.option("-v", "--verbose", is_flag=True, help="Show verbose model details")
-    def models_command(verbose):
+    @click.option("-x", "--extended", is_flag=True, help="Show extended model details (YAML)")
+    def models_command(extended):
         """
-        List registered GitHub Copilot models. Use -v for details.
+        List registered GitHub Copilot models. Use -x for extended details.
         """
         try:
             registered_llm_models = llm.get_models()
@@ -1243,7 +1243,7 @@ def register_commands(cli):
                 click.echo("No GitHub Copilot models are currently registered.")
                 return 0
 
-            if not verbose:
+            if not extended:
                 click.echo("Registered GitHub Copilot models:")
                 for model_id in github_model_ids:
                     click.echo(f"- {model_id}")

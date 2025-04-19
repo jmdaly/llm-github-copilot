@@ -1270,8 +1270,17 @@ def register_commands(cli):
                         click.echo(f"- {model_id}")
                     return 1 # Indicate partial failure
 
-                # Print the raw YAML response, pretty-printed
-                click.echo(yaml.dump(models_data, indent=2, sort_keys=False))
+                # Iterate through models and print each as YAML with separator
+                models_list = models_data.get('data', [])
+                if not models_list:
+                    click.echo("No model details found in the API response.")
+                    return 0
+
+                for i, model_info in enumerate(models_list):
+                    click.echo(yaml.dump(model_info, indent=2, sort_keys=False))
+                    # Add a blank line separator between models, but not after the last one
+                    if i < len(models_list) - 1:
+                        click.echo()
                 return 0
 
         except Exception as e:

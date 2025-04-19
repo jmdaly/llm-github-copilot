@@ -25,8 +25,8 @@ Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 co
 
 ```
 
-$ llm github-copilot auth --help
-Usage: llm github-copilot auth [OPTIONS] COMMAND [ARGS]...
+$ llm github_copilot auth --help
+Usage: llm github_copilot auth [OPTIONS] COMMAND [ARGS]...
 
   Manage GitHub Copilot authentication.
 
@@ -54,7 +54,7 @@ When you run the login command, the plugin will:
 Example login output:
 
 ```
-Usage: llm github-copilot auth login [OPTIONS]
+Usage: llm github_copilot auth login [OPTIONS]
 
   Authenticate with GitHub Copilot to generate a new access token.
 
@@ -64,7 +64,7 @@ Options:
 ```
 
 ```
-$ llm github-copilot auth login
+$ llm github_copilot auth login
 Starting GitHub Copilot authentication to generate a new access token...
 Please visit https://github.com/login/device and enter code XXXX-XXXX to authenticate GitHub Copilot.
 
@@ -75,7 +75,7 @@ Authentication successful!
 You can force a new login and obtain a new access_token even if already authenticated:
 
 ```bash
-llm github-copilot auth login --force
+llm github_copilot auth login --force
 ```
 
 ### Authentication Status
@@ -83,14 +83,14 @@ llm github-copilot auth login --force
 You can check your authentication status with:
 
 ```
-$ llm github-copilot auth status
+$ llm github_copilot auth status
 GitHub Copilot authentication: ✓ Authenticated
 ```
 
 For more detailed information, use the verbose flag:
 
 ```
-$ llm github-copilot auth status --verbose
+$ llm github_copilot auth status --verbose
 GitHub Copilot authentication: ✓ Authenticated
 Access token: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (from LLM key storage)
 API key expires: 2025-04-14 12:34:56
@@ -103,10 +103,10 @@ Once installed, you can use GitHub Copilot models with the `llm` command:
 
 ```bash
 # Chat with GitHub Copilot
-llm -m github-copilot "Write a Python function that calculates the Fibonacci sequence."
+llm -m github_copilot "Write a Python function that calculates the Fibonacci sequence."
 
 # Specify options like length
-llm -m github-copilot "Tell me a joke" -o max_tokens 100
+llm -m github_copilot "Tell me a joke" -o max_tokens 100
 ```
 
 ## Options

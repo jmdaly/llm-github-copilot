@@ -9,7 +9,6 @@ from typing import Optional, Any, Generator, List
 from pydantic import Field, field_validator
 import click
 import secrets
-import yaml
 
 
 def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
@@ -1234,18 +1233,18 @@ def register_commands(cli):
         return 0
 
     @github_copilot_group.command(name="models")
-    @click.option("-v", "--verbose", is_flag=True, help="Show model ID and vendor")
+    @click.option("-v", "--verbose", is_flag=True, help="Show detailed model information")
     @click.option(
-        "-x", "--extended", is_flag=True, help="Show extended model details (YAML)"
+        "--raw", is_flag=True, help="Show raw model details from API (JSON)"
     )
-    def models_command(verbose, extended):
+    def models_command(verbose, raw):
         """
         List registered GitHub Copilot models.
-        Use -v for vendor info, -x for extended details (YAML).
+        Use -v for details, --raw for full JSON output from API.
         """
-        if verbose and extended:
+        if verbose and raw:
             click.echo(
-                "Error: Cannot use both -v and -x flags simultaneously.", err=True
+                "Error: Cannot use both -v and --raw flags simultaneously.", err=True
             )
             return 1
 
@@ -1264,13 +1263,13 @@ def register_commands(cli):
                 return 0
 
             # Default output (no flags)
-            if not verbose and not extended:
+            if not verbose and not raw:
                 click.echo("Registered GitHub Copilot models:")
                 for model_id in github_model_ids:
                     click.echo(f"- {model_id}")
                 return 0
 
-            # Fetch data if verbose or extended
+            # Fetch data if verbose or raw
             authenticator = GitHubCopilotAuthenticator()
             if not authenticator.has_valid_credentials():
                 click.echo(

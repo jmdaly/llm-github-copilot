@@ -1287,9 +1287,10 @@ def register_commands(cli):
                         supports = capabilities.get('supports', {})
                         vision = capabilities.get('vision', {})
                         tools = capabilities.get('tools', {})
-                        limits = model_info.get('limits', {}) # Get limits dict
+                        # Get limits nested within capabilities
+                        limits = capabilities.get('limits', {})
 
-                        click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use limits for context length
+                        click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use nested limits for context length
                         click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
                         click.echo(f"  Supports Schema: {supports.get('schema', False)}")
                         click.echo(f"  Supports Tool Calls: {tools.get('supported', False)}")
@@ -1311,9 +1312,10 @@ def register_commands(cli):
                              supports = capabilities.get('supports', {})
                              vision = capabilities.get('vision', {})
                              tools = capabilities.get('tools', {})
-                             limits = model_info.get('limits', {}) # Get limits dict
+                             # Get limits nested within capabilities
+                             limits = capabilities.get('limits', {})
 
-                             click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use limits for context length
+                             click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use nested limits for context length
                              click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
                              click.echo(f"  Supports Schema: {supports.get('schema', False)}")
                              click.echo(f"  Supports Tool Calls: {tools.get('supported', False)}")

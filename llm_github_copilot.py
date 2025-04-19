@@ -1225,25 +1225,91 @@ def register_commands(cli):
         return 0
 
     @github_copilot_group.command(name="models")
-    def models_command():
+    @click.option("-v", "--verbose", is_flag=True, help="Show verbose model details")
+    def models_command(verbose):
         """
-        List registered GitHub Copilot models.
+        List registered GitHub Copilot models. Use -v for details.
         """
         try:
-            registered_models = llm.get_models()
-            github_models = [
+            registered_llm_models = llm.get_models()
+            github_model_ids = sorted([
                 model.model_id
-                for model in registered_models
+                for model in registered_llm_models
                 if model.model_id.startswith("github-copilot")
-            ]
+            ])
 
-            if github_models:
-                click.echo("Registered GitHub Copilot models:")
-                for model_id in sorted(github_models):
-                    click.echo(f"- {model_id}")
-            else:
+            if not github_model_ids:
                 click.echo("No GitHub Copilot models are currently registered.")
-            return 0
+                return 0
+
+            if not verbose:
+                click.echo("Registered GitHub Copilot models:")
+                for model_id in github_model_ids:
+                    click.echo(f"- {model_id}")
+                return 0
+            else:
+                # Verbose output requires fetching details from API
+                authenticator = GitHubCopilotAuthenticator()
+                if not authenticator.has_valid_credentials():
+                    click.echo("Authentication required for verbose model details.", err=True)
+                    click.echo(
+                        "Run 'llm github-copilot auth login' or set $GH_COPILOT_TOKEN/$GITHUB_COPILOT_TOKEN.",
+                        err=True,
+                    )
+                    return 1
+
+                click.echo("Fetching detailed model information...")
+                try:
+                    models_data = _fetch_models_data(authenticator)
+                    api_models_info = {model['id']: model for model in models_data.get('data', [])}
+                except Exception as e:
+                    click.echo(f"Error fetching model details from API: {str(e)}", err=True)
+                    click.echo("Showing basic registered model list instead:")
+                    for model_id in github_model_ids:
+                        click.echo(f"- {model_id}")
+                    return 1 # Indicate partial failure
+
+                click.echo("Registered GitHub Copilot models (verbose):")
+                model_mappings = GitHubCopilot.get_model_mappings()
+
+                for model_id in github_model_ids:
+                    click.echo(f"\nModel ID: {model_id}")
+                    # Find the corresponding API model name
+                    api_model_name = model_mappings.get(model_id)
+
+                    if api_model_name and api_model_name in api_models_info:
+                        model_info = api_models_info[api_model_name]
+                        click.echo(f"  API Name: {api_model_name}")
+                        click.echo(f"  Description: {model_info.get('description', 'N/A')}")
+                        capabilities = model_info.get('capabilities', {})
+                        supports = capabilities.get('supports', {})
+                        click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
+                        # Add more details as needed, e.g., context length, limits
+                        limits = model_info.get('limits', {})
+                        if limits:
+                             click.echo(f"  Limits: {json.dumps(limits, indent=4)}")
+
+                    elif model_id == "github-copilot":
+                         # Special handling for the default alias
+                         default_api_name = GitHubCopilot.DEFAULT_MODEL_MAPPING
+                         click.echo(f"  (Default alias for: {default_api_name})")
+                         if default_api_name in api_models_info:
+                             model_info = api_models_info[default_api_name]
+                             click.echo(f"  API Name: {default_api_name}")
+                             click.echo(f"  Description: {model_info.get('description', 'N/A')}")
+                             capabilities = model_info.get('capabilities', {})
+                             supports = capabilities.get('supports', {})
+                             click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
+                             limits = model_info.get('limits', {})
+                             if limits:
+                                 click.echo(f"  Limits: {json.dumps(limits, indent=4)}")
+                         else:
+                             click.echo("  Details for default model not found in API response.")
+                    else:
+                        click.echo("  Details not found in current API response.")
+
+                return 0
+
         except Exception as e:
             click.echo(f"Error listing registered models: {str(e)}", err=True)
             return 1

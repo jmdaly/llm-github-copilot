@@ -1266,7 +1266,7 @@ def register_commands(cli):
             if not verbose and not raw:
                 click.echo("Registered GitHub Copilot models:")
                 for model_id in github_model_ids:
-                    click.echo(f"- {model_id}")
+                    click.echo(model_id) # Removed leading "- "
                 return 0
 
             # Fetch data if verbose or raw

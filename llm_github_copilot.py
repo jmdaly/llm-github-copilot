@@ -1223,3 +1223,33 @@ def register_commands(cli):
 
         click.echo("GitHub Copilot logout completed successfully.")
         return 0
+
+    @github_copilot_group.command(name="models")
+    def models_command():
+        """
+        List available GitHub Copilot models.
+        """
+        authenticator = GitHubCopilotAuthenticator()
+
+        # Check if authenticated
+        if not authenticator.has_valid_credentials():
+            click.echo("GitHub Copilot authentication required.", err=True)
+            click.echo(
+                "Run 'llm github-copilot auth login' to authenticate or set $GH_COPILOT_TOKEN or $GITHUB_COPILOT_TOKEN.",
+                err=True,
+            )
+            return 1
+
+        try:
+            click.echo("Fetching available models...")
+            models = fetch_available_models(authenticator)
+            if models:
+                click.echo("Available models:")
+                for model_id in sorted(list(models)):
+                    click.echo(f"- {model_id}")
+            else:
+                click.echo("No models found or unable to fetch models.")
+            return 0
+        except Exception as e:
+            click.echo(f"Error fetching models: {str(e)}", err=True)
+            return 1

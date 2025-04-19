@@ -1333,8 +1333,10 @@ def register_commands(cli):
                     click.echo(f"name: {name}")
                     click.echo(f"vendor: {vendor}")
                     click.echo(f"version: {version}")
-                    click.echo(f"family: {family}") # Print family
-                    click.echo(f"context_length: {context_length}")
+                    click.echo(f"family: {family}")
+                    # Format context_length with commas if it's a number
+                    formatted_context_length = f"{context_length:,}" if isinstance(context_length, int) else context_length
+                    click.echo(f"context_length: {formatted_context_length}")
 
                     # Add a blank line separator between models, but not after the last one
                     if i < len(github_model_ids) - 1:

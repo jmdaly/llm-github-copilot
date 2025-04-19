@@ -1249,34 +1249,36 @@ def register_commands(cli):
                 click.echo("No GitHub Copilot models are currently registered.")
                 return 0
 
-            if not extended:
+            # Default output (no flags)
+            if not verbose and not extended:
                 click.echo("Registered GitHub Copilot models:")
                 for model_id in github_model_ids:
                     click.echo(f"- {model_id}")
                 return 0
-            else:
-                # Verbose output requires fetching details from API
-                authenticator = GitHubCopilotAuthenticator()
-                if not authenticator.has_valid_credentials():
-                    click.echo("Authentication required for verbose model details.", err=True)
-                    click.echo(
-                        "Run 'llm github-copilot auth login' or set $GH_COPILOT_TOKEN/$GITHUB_COPILOT_TOKEN.",
-                        err=True,
-                    )
-                    return 1
 
-                click.echo("Fetching detailed model information...")
-                try:
-                    models_data = _fetch_models_data(authenticator)
-                    api_models_info = {model['id']: model for model in models_data.get('data', [])}
-                except Exception as e:
-                    click.echo(f"Error fetching model details from API: {str(e)}", err=True)
-                    click.echo("Showing basic registered model list instead:")
-                    for model_id in github_model_ids:
-                        click.echo(f"- {model_id}")
-                    return 1 # Indicate partial failure
+            # Fetch data if verbose or extended
+            authenticator = GitHubCopilotAuthenticator()
+            if not authenticator.has_valid_credentials():
+                click.echo("Authentication required for detailed model information.", err=True)
+                click.echo(
+                    "Run 'llm github-copilot auth login' or set $GH_COPILOT_TOKEN/$GITHUB_COPILOT_TOKEN.",
+                    err=True,
+                )
+                return 1
 
-                # Iterate through models and print each as YAML with separator
+            click.echo("Fetching detailed model information...")
+            try:
+                models_data = _fetch_models_data(authenticator)
+                api_models_info = {model['id']: model for model in models_data.get('data', [])}
+            except Exception as e:
+                click.echo(f"Error fetching model details from API: {str(e)}", err=True)
+                click.echo("Showing basic registered model list instead:")
+                for model_id in github_model_ids:
+                    click.echo(f"- {model_id}")
+                return 1 # Indicate partial failure
+
+            # Extended output (-x)
+            if extended:
                 models_list = models_data.get('data', [])
                 if not models_list:
                     click.echo("No model details found in the API response.")
@@ -1284,9 +1286,26 @@ def register_commands(cli):
 
                 for i, model_info in enumerate(models_list):
                     click.echo(yaml.dump(model_info, indent=2, sort_keys=False))
-                    # Add a blank line separator between models, but not after the last one
                     if i < len(models_list) - 1:
                         click.echo()
+                return 0
+
+            # Verbose output (-v)
+            elif verbose:
+                click.echo("Registered GitHub Copilot models (ID: Vendor):")
+                model_mappings = GitHubCopilot.get_model_mappings()
+
+                for model_id in github_model_ids:
+                    api_model_name = model_mappings.get(model_id)
+                    vendor = "N/A"
+                    if api_model_name and api_model_name in api_models_info:
+                        vendor = api_models_info[api_model_name].get('vendor', 'N/A')
+                    elif model_id == "github-copilot": # Handle default alias
+                        default_api_name = GitHubCopilot.DEFAULT_MODEL_MAPPING
+                        if default_api_name in api_models_info:
+                             vendor = api_models_info[default_api_name].get('vendor', 'N/A')
+
+                    click.echo(f"- {model_id}: {vendor}")
                 return 0
 
         except Exception as e:

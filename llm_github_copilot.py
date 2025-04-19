@@ -15,16 +15,16 @@ import yaml
 def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
     """
     Helper function to fetch raw model data from the GitHub Copilot API.
-    
+
     This function makes an HTTP request to the GitHub Copilot API to retrieve
     information about available models. It handles authentication and error reporting.
-    
+
     Args:
         authenticator: The GitHubCopilotAuthenticator instance to use for authentication
-        
+
     Returns:
         dict: The raw JSON response from the API containing model data
-        
+
     Raises:
         Exception: If the API request fails for any reason
     """
@@ -42,7 +42,9 @@ def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
         response.raise_for_status()
         return response.json()
     except httpx.HTTPStatusError as e:
-        print(f"Error fetching models data (HTTP {e.response.status_code}): {e.response.text}")
+        print(
+            f"Error fetching models data (HTTP {e.response.status_code}): {e.response.text}"
+        )
         raise
     except httpx.RequestError as e:
         print(f"Error fetching models data (Request Error): {str(e)}")
@@ -85,16 +87,16 @@ def register_models(register):
 def fetch_available_models(authenticator: "GitHubCopilotAuthenticator") -> set[str]:
     """
     Fetches available model IDs from the GitHub Copilot API.
-    
+
     This function retrieves the list of available models from the GitHub Copilot API
     and formats them as LLM-compatible model IDs (e.g., "github-copilot/claude-3-7-sonnet").
-    
+
     Args:
         authenticator: The GitHubCopilotAuthenticator instance to use for authentication
-        
+
     Returns:
         set[str]: A set of available model IDs, always including at least "github-copilot"
-        
+
     Note:
         If the API request fails, this function will return a minimal set containing
         only the default "github-copilot" model ID.
@@ -156,14 +158,14 @@ class GitHubCopilotAuthenticator:
     def has_valid_credentials(self) -> bool:
         """
         Check if we have valid API credentials without triggering authentication.
-        
+
         This method checks for valid credentials in the following order:
         1. Checks if a valid API key file exists with a non-expired token
         2. Checks if a valid access token exists in the LLM key storage
-        
+
         Returns:
             bool: True if valid credentials exist, False otherwise
-            
+
         Note:
             This method does not attempt to refresh or obtain new credentials.
         """
@@ -189,13 +191,13 @@ class GitHubCopilotAuthenticator:
     def _get_github_headers(self, access_token: Optional[str] = None) -> dict[str, str]:
         """
         Generate standard GitHub headers for API requests.
-        
+
         Creates a dictionary of HTTP headers required for GitHub API requests,
         optionally including an authorization header with the provided access token.
-        
+
         Args:
             access_token: Optional GitHub access token to include in the headers
-            
+
         Returns:
             dict[str, str]: Dictionary of HTTP headers for GitHub API requests
         """
@@ -249,7 +251,9 @@ class GitHubCopilotAuthenticator:
         except (TypeError, Exception):
             access_token = None
 
-        if not access_token and not (os.environ.get("GH_COPILOT_TOKEN") or os.environ.get("GITHUB_COPILOT_TOKEN")):
+        if not access_token and not (
+            os.environ.get("GH_COPILOT_TOKEN") or os.environ.get("GITHUB_COPILOT_TOKEN")
+        ):
             raise Exception(
                 "GitHub Copilot authentication required. Run 'llm github-copilot auth login' first."
             )
@@ -265,16 +269,16 @@ class GitHubCopilotAuthenticator:
     def _get_device_code(self) -> dict[str, str]:
         """
         Get a device code for GitHub authentication using the device flow.
-        
+
         This method initiates the GitHub device flow authentication process by
         requesting a device code from the GitHub API. The device code is used
         to associate the user's browser session with this application.
-        
+
         Returns:
             dict[str, str]: A dictionary containing the device code, user code,
                            verification URI, and other information needed for
                            the authentication flow
-                           
+
         Raises:
             Exception: If the request fails or the response is missing required fields
         """
@@ -309,18 +313,18 @@ class GitHubCopilotAuthenticator:
     def _poll_for_access_token(self, device_code: str) -> str:
         """
         Poll for an access token after user authentication.
-        
+
         This method repeatedly polls the GitHub API to check if the user has
         completed the authentication process in their browser. It continues
         polling until either the user completes authentication, an error occurs,
         or the maximum number of polling attempts is reached.
-        
+
         Args:
             device_code: The device code obtained from _get_device_code()
-            
+
         Returns:
             str: The GitHub access token if authentication is successful
-            
+
         Raises:
             Exception: If polling times out or an error occurs during polling
         """
@@ -372,15 +376,15 @@ class GitHubCopilotAuthenticator:
     def _login(self) -> str:
         """
         Login to GitHub Copilot using device code flow.
-        
+
         This method orchestrates the complete GitHub device flow authentication process:
         1. Obtains a device code and user code
         2. Displays instructions for the user to complete authentication in their browser
         3. Polls for the access token until the user completes authentication
-        
+
         Returns:
             str: The GitHub access token if authentication is successful
-            
+
         Raises:
             Exception: If any step of the authentication process fails
         """
@@ -400,15 +404,15 @@ class GitHubCopilotAuthenticator:
     def _refresh_api_key(self) -> dict[str, Any]:
         """
         Refresh the API key using the access token.
-        
+
         This method exchanges a GitHub access token for a GitHub Copilot API key
         by making a request to the GitHub Copilot API. It includes retry logic
         to handle transient failures.
-        
+
         Returns:
             dict[str, Any]: A dictionary containing the API key and its expiration time
                            in the format {"token": "api_key", "expires_at": timestamp}
-                           
+
         Raises:
             Exception: If the API key cannot be refreshed after maximum retries
         """
@@ -456,7 +460,9 @@ class GitHubCopilotAuthenticator:
             access_token = self.get_access_token()
             headers = self._get_github_headers(access_token)
             client = httpx.Client()
-            response = client.get("https://api.github.com/user", headers=headers, timeout=30)
+            response = client.get(
+                "https://api.github.com/user", headers=headers, timeout=30
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -529,14 +535,14 @@ class GitHubCopilot(llm.Model):
     def get_model_mappings(cls) -> dict[str, str]:
         """
         Get model mappings, fetching them if not already cached.
-        
+
         This method retrieves the mapping between LLM model IDs (e.g., "github-copilot/gpt-4o")
         and the corresponding API model names (e.g., "gpt-4o"). It caches the results
         to avoid unnecessary API calls.
-        
+
         Returns:
             Dict mapping model IDs to API model names
-            
+
         Note:
             If fetching the mappings fails, a default mapping will be returned
             that includes only the default model.
@@ -545,7 +551,7 @@ class GitHubCopilot(llm.Model):
             try:
                 # Create a temporary authenticator to fetch models
                 authenticator = GitHubCopilotAuthenticator()
-                models_data = _fetch_models_data(authenticator) # Use helper
+                models_data = _fetch_models_data(authenticator)  # Use helper
 
                 mappings = {"github-copilot": cls.DEFAULT_MODEL_MAPPING}
 
@@ -571,13 +577,13 @@ class GitHubCopilot(llm.Model):
     def get_streaming_models(cls) -> list[str]:
         """
         Get the list of models that support streaming responses.
-        
+
         This method retrieves information about which models support streaming responses
         from the GitHub Copilot API. It caches the results to avoid unnecessary API calls.
-        
+
         Returns:
             list[str]: A list of API model names that support streaming
-            
+
         Note:
             If fetching the streaming models fails, it will assume all models
             support streaming as a fallback.
@@ -586,7 +592,7 @@ class GitHubCopilot(llm.Model):
             try:
                 # Create a temporary authenticator to fetch models
                 authenticator = GitHubCopilotAuthenticator()
-                models_data = _fetch_models_data(authenticator) # Use helper
+                models_data = _fetch_models_data(authenticator)  # Use helper
 
                 streaming_models = []
 
@@ -646,20 +652,20 @@ class GitHubCopilot(llm.Model):
     ) -> Generator[str, None, None]:
         """
         Handle a non-streaming request to the GitHub Copilot API.
-        
+
         This method sends a non-streaming request to the GitHub Copilot API
         and processes the response. It handles various response formats and
         error conditions.
-        
+
         Args:
             prompt: The LLM prompt object
             headers: HTTP headers for the request
             payload: The request payload (will have stream=False set)
             model_name: The API model name to use
-            
+
         Yields:
             str: The generated text from the API response
-            
+
         Note:
             In case of errors, this method yields an error message instead of raising
             an exception to maintain compatibility with the streaming interface.
@@ -734,20 +740,20 @@ class GitHubCopilot(llm.Model):
     ) -> Generator[str, None, None]:
         """
         Execute a prompt against the GitHub Copilot API.
-        
+
         This is the main method that processes a prompt and returns a response.
         It handles authentication, builds the request payload, determines whether
         to use streaming or non-streaming mode, and processes the response.
-        
+
         Args:
             prompt: The LLM prompt object containing the user's input
             stream: Whether to stream the response (if supported by the model)
             response: The LLM response object to populate
             conversation: Optional conversation history to include in the request
-            
+
         Yields:
             str: Chunks of the generated text from the API response
-            
+
         Note:
             If authentication fails, this method yields an error message instead
             of raising an exception.
@@ -809,15 +815,15 @@ class GitHubCopilot(llm.Model):
     ) -> list[dict[str, str]]:
         """
         Build the messages array for the API request from the conversation history.
-        
+
         This method constructs the messages array required by the GitHub Copilot API
         by extracting previous messages from the conversation history and adding
         the current prompt. It also ensures a system message is included.
-        
+
         Args:
             prompt: The current LLM prompt object
             conversation: Optional conversation history
-            
+
         Returns:
             list[dict[str, str]]: A list of message objects in the format required
                                  by the GitHub Copilot API, each with 'role' and 'content'
@@ -868,20 +874,20 @@ class GitHubCopilot(llm.Model):
     ) -> Generator[str, None, None]:
         """
         Handle a streaming request to the GitHub Copilot API.
-        
+
         This method sends a streaming request to the GitHub Copilot API and
         processes the server-sent events (SSE) response. It parses each event
         and extracts the generated text chunks.
-        
+
         Args:
             prompt: The LLM prompt object
             headers: HTTP headers for the request
             payload: The request payload (will have stream=True set)
             model_name: The API model name to use
-            
+
         Yields:
             str: Chunks of the generated text from the streaming API response
-            
+
         Note:
             If streaming fails, this method falls back to a non-streaming request
             to ensure the user still gets a response.
@@ -1075,7 +1081,6 @@ def register_commands(cli):
             else:
                 click.echo("GitHub Copilot User: <unable to fetch>")
 
-
             # Only display the access token if verbose mode is enabled
             if verbose:
                 try:
@@ -1088,7 +1093,7 @@ def register_commands(cli):
                             env_var_used = env_var
                             env_token = token.strip()
                             break
-                            
+
                     if env_token:
                         click.echo(
                             f"Access token: {env_token} (from environment variable {env_var_used})"
@@ -1162,7 +1167,10 @@ def register_commands(cli):
             except (TypeError, Exception):
                 access_token = None
 
-            if not access_token and not (os.environ.get("GH_COPILOT_TOKEN") or os.environ.get("GITHUB_COPILOT_TOKEN")):
+            if not access_token and not (
+                os.environ.get("GH_COPILOT_TOKEN")
+                or os.environ.get("GITHUB_COPILOT_TOKEN")
+            ):
                 click.echo(
                     "No access token found. Run 'llm github-copilot auth login' first."
                 )
@@ -1227,23 +1235,29 @@ def register_commands(cli):
 
     @github_copilot_group.command(name="models")
     @click.option("-v", "--verbose", is_flag=True, help="Show model ID and vendor")
-    @click.option("-x", "--extended", is_flag=True, help="Show extended model details (YAML)")
+    @click.option(
+        "-x", "--extended", is_flag=True, help="Show extended model details (YAML)"
+    )
     def models_command(verbose, extended):
         """
         List registered GitHub Copilot models.
         Use -v for vendor info, -x for extended details (YAML).
         """
         if verbose and extended:
-            click.echo("Error: Cannot use both -v and -x flags simultaneously.", err=True)
+            click.echo(
+                "Error: Cannot use both -v and -x flags simultaneously.", err=True
+            )
             return 1
 
         try:
             registered_llm_models = llm.get_models()
-            github_model_ids = sorted([
-                model.model_id
-                for model in registered_llm_models
-                if model.model_id.startswith("github-copilot")
-            ])
+            github_model_ids = sorted(
+                [
+                    model.model_id
+                    for model in registered_llm_models
+                    if model.model_id.startswith("github-copilot")
+                ]
+            )
 
             if not github_model_ids:
                 click.echo("No GitHub Copilot models are currently registered.")
@@ -1259,7 +1273,9 @@ def register_commands(cli):
             # Fetch data if verbose or extended
             authenticator = GitHubCopilotAuthenticator()
             if not authenticator.has_valid_credentials():
-                click.echo("Authentication required for detailed model information.", err=True)
+                click.echo(
+                    "Authentication required for detailed model information.", err=True
+                )
                 click.echo(
                     "Run 'llm github-copilot auth login' or set $GH_COPILOT_TOKEN/$GITHUB_COPILOT_TOKEN.",
                     err=True,
@@ -1269,17 +1285,19 @@ def register_commands(cli):
             click.echo("Fetching detailed model information...")
             try:
                 models_data = _fetch_models_data(authenticator)
-                api_models_info = {model['id']: model for model in models_data.get('data', [])}
+                api_models_info = {
+                    model["id"]: model for model in models_data.get("data", [])
+                }
             except Exception as e:
                 click.echo(f"Error fetching model details from API: {str(e)}", err=True)
                 click.echo("Showing basic registered model list instead:")
                 for model_id in github_model_ids:
                     click.echo(f"- {model_id}")
-                return 1 # Indicate partial failure
+                return 1  # Indicate partial failure
 
             # Extended output (-x)
             if extended:
-                models_list = models_data.get('data', [])
+                models_list = models_data.get("data", [])
                 if not models_list:
                     click.echo("No model details found in the API response.")
                     return 0
@@ -1301,42 +1319,50 @@ def register_commands(cli):
                     name = "N/A"
                     version = "N/A"
                     context_length = "N/A"
-                    family = "N/A" # Initialize family
+                    family = "N/A"  # Initialize family
 
                     if api_model_name and api_model_name in api_models_info:
                         model_info = api_models_info[api_model_name]
-                        vendor = model_info.get('vendor', 'N/A')
-                        name = model_info.get('name', 'N/A')
-                        version = model_info.get('version', 'N/A')
+                        vendor = model_info.get("vendor", "N/A")
+                        name = model_info.get("name", "N/A")
+                        version = model_info.get("version", "N/A")
                         # Get capabilities and limits
-                        capabilities = model_info.get('capabilities', {})
-                        limits = capabilities.get('limits', {})
+                        capabilities = model_info.get("capabilities", {})
+                        limits = capabilities.get("limits", {})
                         # Extract details
-                        context_length = limits.get('max_context_window_tokens', 'N/A')
-                        family = capabilities.get('family', 'N/A') # Get family
-                    elif model_id == "github-copilot": # Handle default alias
+                        context_length = limits.get("max_context_window_tokens", "N/A")
+                        family = capabilities.get("family", "N/A")  # Get family
+                    elif model_id == "github-copilot":  # Handle default alias
                         default_api_name = GitHubCopilot.DEFAULT_MODEL_MAPPING
                         if default_api_name in api_models_info:
-                             model_info = api_models_info[default_api_name]
-                             vendor = model_info.get('vendor', 'N/A')
-                             name = model_info.get('name', 'N/A')
-                             version = model_info.get('version', 'N/A')
-                             # Get capabilities and limits for default
-                             capabilities = model_info.get('capabilities', {})
-                             limits = capabilities.get('limits', {})
-                             # Extract details for default
-                             context_length = limits.get('max_context_window_tokens', 'N/A')
-                             family = capabilities.get('family', 'N/A') # Get family for default
+                            model_info = api_models_info[default_api_name]
+                            vendor = model_info.get("vendor", "N/A")
+                            name = model_info.get("name", "N/A")
+                            version = model_info.get("version", "N/A")
+                            # Get capabilities and limits for default
+                            capabilities = model_info.get("capabilities", {})
+                            limits = capabilities.get("limits", {})
+                            # Extract details for default
+                            context_length = limits.get(
+                                "max_context_window_tokens", "N/A"
+                            )
+                            family = capabilities.get(
+                                "family", "N/A"
+                            )  # Get family for default
 
                     # Print model details
-                    click.echo(f"id: {model_id}")
-                    click.echo(f"name: {name}")
-                    click.echo(f"vendor: {vendor}")
-                    click.echo(f"version: {version}")
-                    click.echo(f"family: {family}")
+                    formatted_context_length = (
+                        f"{context_length:,}"
+                        if isinstance(context_length, int)
+                        else context_length
+                    )
+                    click.echo(f"- id: {model_id}")
+                    click.echo(f"  vendor: {vendor}")
+                    click.echo(f"  name: {name}")
+                    click.echo(f"  version: {version}")
+                    click.echo(f"  family: {family}")
+                    click.echo(f"  context_length: {formatted_context_length}")
                     # Format context_length with commas if it's a number
-                    formatted_context_length = f"{context_length:,}" if isinstance(context_length, int) else context_length
-                    click.echo(f"context_length: {formatted_context_length}")
 
                     # Add a blank line separator between models, but not after the last one
                     if i < len(github_model_ids) - 1:

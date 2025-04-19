@@ -1227,29 +1227,23 @@ def register_commands(cli):
     @github_copilot_group.command(name="models")
     def models_command():
         """
-        List available GitHub Copilot models.
+        List registered GitHub Copilot models.
         """
-        authenticator = GitHubCopilotAuthenticator()
-
-        # Check if authenticated
-        if not authenticator.has_valid_credentials():
-            click.echo("GitHub Copilot authentication required.", err=True)
-            click.echo(
-                "Run 'llm github-copilot auth login' to authenticate or set $GH_COPILOT_TOKEN or $GITHUB_COPILOT_TOKEN.",
-                err=True,
-            )
-            return 1
-
         try:
-            click.echo("Fetching available models...")
-            models = fetch_available_models(authenticator)
-            if models:
-                click.echo("Available models:")
-                for model_id in sorted(list(models)):
+            registered_models = llm.get_models()
+            github_models = [
+                model.model_id
+                for model in registered_models
+                if model.model_id.startswith("github-copilot")
+            ]
+
+            if github_models:
+                click.echo("Registered GitHub Copilot models:")
+                for model_id in sorted(github_models):
                     click.echo(f"- {model_id}")
             else:
-                click.echo("No models found or unable to fetch models.")
+                click.echo("No GitHub Copilot models are currently registered.")
             return 0
         except Exception as e:
-            click.echo(f"Error fetching models: {str(e)}", err=True)
+            click.echo(f"Error listing registered models: {str(e)}", err=True)
             return 1

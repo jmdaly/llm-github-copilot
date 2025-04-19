@@ -1299,22 +1299,26 @@ def register_commands(cli):
                     api_model_name = model_mappings.get(model_id)
                     vendor = "N/A"
                     name = "N/A"
+                    version = "N/A" # Initialize version
 
                     if api_model_name and api_model_name in api_models_info:
                         model_info = api_models_info[api_model_name]
                         vendor = model_info.get('vendor', 'N/A')
                         name = model_info.get('name', 'N/A')
+                        version = model_info.get('version', 'N/A') # Get version
                     elif model_id == "github-copilot": # Handle default alias
                         default_api_name = GitHubCopilot.DEFAULT_MODEL_MAPPING
                         if default_api_name in api_models_info:
                              model_info = api_models_info[default_api_name]
                              vendor = model_info.get('vendor', 'N/A')
                              name = model_info.get('name', 'N/A')
+                             version = model_info.get('version', 'N/A') # Get version for default
 
                     # Print model details
                     click.echo(f"id: {model_id}")
                     click.echo(f"name: {name}")
                     click.echo(f"vendor: {vendor}")
+                    click.echo(f"version: {version}") # Print version
 
                     # Add a blank line separator between models, but not after the last one
                     if i < len(github_model_ids) - 1:

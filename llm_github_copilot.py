@@ -1287,17 +1287,15 @@ def register_commands(cli):
                         supports = capabilities.get('supports', {})
                         vision = capabilities.get('vision', {})
                         tools = capabilities.get('tools', {})
+                        limits = model_info.get('limits', {}) # Get limits dict
 
-                        click.echo(f"  Context Length: {capabilities.get('context_length', 'N/A')}")
+                        click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use limits for context length
                         click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
                         click.echo(f"  Supports Schema: {supports.get('schema', False)}")
                         click.echo(f"  Supports Tool Calls: {tools.get('supported', False)}")
                         click.echo(f"  Supported Vision Media Types: {vision.get('supported_media_types', [])}")
 
-                        # Optionally display limits if they exist
-                        limits = model_info.get('limits', {})
-                        if limits:
-                             click.echo(f"  Limits: {json.dumps(limits, indent=2)}") # Use indent=2 for compactness
+                        # Removed redundant printing of the full limits dict
 
                     elif model_id == "github-copilot":
                          # Special handling for the default alias
@@ -1313,16 +1311,15 @@ def register_commands(cli):
                              supports = capabilities.get('supports', {})
                              vision = capabilities.get('vision', {})
                              tools = capabilities.get('tools', {})
+                             limits = model_info.get('limits', {}) # Get limits dict
 
-                             click.echo(f"  Context Length: {capabilities.get('context_length', 'N/A')}")
+                             click.echo(f"  Context Length: {limits.get('max_context_window_tokens', 'N/A')}") # Use limits for context length
                              click.echo(f"  Supports Streaming: {supports.get('streaming', False)}")
                              click.echo(f"  Supports Schema: {supports.get('schema', False)}")
                              click.echo(f"  Supports Tool Calls: {tools.get('supported', False)}")
                              click.echo(f"  Supported Vision Media Types: {vision.get('supported_media_types', [])}")
 
-                             limits = model_info.get('limits', {})
-                             if limits:
-                                 click.echo(f"  Limits: {json.dumps(limits, indent=2)}")
+                             # Removed redundant printing of the full limits dict
                          else:
                              click.echo("  Details for default model not found in API response.")
                     else:

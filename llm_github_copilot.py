@@ -443,6 +443,25 @@ class GitHubCopilotAuthenticator:
 
         raise Exception("Failed to refresh API key after maximum retries")
 
+    def _get_github_user_info(self) -> Optional[dict[str, Any]]:
+        """
+        Fetch user information from GitHub API using the access token.
+
+        Returns:
+            dict[str, Any]: Dictionary containing user information (e.g., login)
+                            or None if fetching fails.
+        """
+        try:
+            access_token = self.get_access_token()
+            headers = self._get_github_headers(access_token)
+            client = httpx.Client()
+            response = client.get("https://api.github.com/user", headers=headers, timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"Warning: Failed to fetch GitHub user info: {str(e)}")
+            return None
+
 
 class GitHubCopilot(llm.Model):
     """
@@ -1047,6 +1066,14 @@ def register_commands(cli):
 
         if authenticator.has_valid_credentials():
             click.echo("GitHub Copilot authentication: ✓ Authenticated")
+
+            # Fetch and display GitHub user info
+            user_info = authenticator._get_github_user_info()
+            if user_info and "login" in user_info:
+                click.echo(f"GitHub Copilot User: {user_info['login']}")
+            else:
+                click.echo("GitHub Copilot User: <unable to fetch>")
+
 
             # Only display the access token if verbose mode is enabled
             if verbose:

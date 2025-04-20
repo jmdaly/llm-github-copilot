@@ -148,11 +148,12 @@ class TestAuthStatus:
             if mock_authenticator.has_valid_credentials():
                 click.echo("GitHub Copilot authentication: ✓ Authenticated")
         
-        # Run the command
-        result = cli_runner.invoke(mock_status_command)
-        
+        # Run the command using llm_cli
+        result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status"])
+
         # Check the output
         assert "GitHub Copilot authentication: ✓ Authenticated" in result.output
+        assert result.exit_code == 0, f"CLI Error: {result.output}"
     
     def test_status_not_authenticated(self, cli_runner, mock_authenticator):
         """Test status when not authenticated."""
@@ -166,11 +167,12 @@ class TestAuthStatus:
             if not mock_authenticator.has_valid_credentials():
                 click.echo("GitHub Copilot authentication: ✗ Not authenticated")
         
-        # Run the command
-        result = cli_runner.invoke(mock_status_command)
-        
+        # Run the command using llm_cli
+        result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status"])
+
         # Check the output
         assert "GitHub Copilot authentication: ✗ Not authenticated" in result.output
+        assert result.exit_code == 0, f"CLI Error: {result.output}" # Status command should exit 0 even if not authenticated
     
     def test_status_verbose(self, cli_runner, mock_authenticator):
         """Test verbose status output."""
@@ -198,14 +200,109 @@ class TestAuthStatus:
                             api_key_info = json.loads(Path.read_text(mock_authenticator.api_key_file))
                             api_key = api_key_info.get("token", "")
                             click.echo(f"API key: {api_key}")
-                
-                # Run the command with verbose flag
-                result = cli_runner.invoke(mock_status_command, ["--verbose"])
-                
+                # Run the command with verbose flag using llm_cli
+                result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status", "--verbose"])
+
                 # Check the output
                 assert "GitHub Copilot authentication: ✓ Authenticated" in result.output
                 assert "Access token: mock_access_token" in result.output
                 assert "API key: mock_api_key" in result.output
+                assert result.exit_code == 0, f"CLI Error: {result.output}"
+
+    def test_status_verbose_not_authenticated(self, cli_runner, mock_authenticator):
+        """Test verbose status when not authenticated."""
+        mock_authenticator.has_valid_credentials.return_value = False
+
+        # Run the command using llm_cli
+        result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status", "--verbose"])
+
+        # Check the output - should still show not authenticated, no token/key info
+        assert "GitHub Copilot authentication: ✗ Not authenticated" in result.output
+        assert "Access token:" not in result.output
+        assert "API key:" not in result.output
+        assert result.exit_code == 0, f"CLI Error: {result.output}"
+
+    def test_status_verbose_env_var_only(self, cli_runner, mock_authenticator):
+        """Test verbose status with only environment variable set."""
+        mock_authenticator.has_valid_credentials.return_value = True # Env var counts as valid
+        mock_authenticator._get_github_user_info.return_value = {"login": "testuser_env"}
+
+        with patch.dict(os.environ, {"GH_COPILOT_TOKEN": "test_env_token"}, clear=True), \
+             patch("llm.get_key", return_value=None), \
+             patch("pathlib.Path.exists", return_value=False): # No LLM key or API file
+
+            # Run the command using llm_cli
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status", "--verbose"])
+
+            # Check the output
+            assert "GitHub Copilot authentication: ✓ Authenticated" in result.output
+            assert "GitHub Copilot User: testuser_env" in result.output
+            assert "Access token: test_env_token (from environment variable GH_COPILOT_TOKEN)" in result.output
+            assert "API key status: Not found or invalid" in result.output
+            assert result.exit_code == 0, f"CLI Error: {result.output}"
+
+    def test_status_verbose_llm_key_only(self, cli_runner, mock_authenticator):
+        """Test verbose status with only LLM key set."""
+        mock_authenticator.has_valid_credentials.return_value = True # LLM key counts as valid
+        mock_authenticator._get_github_user_info.return_value = {"login": "testuser_llm"}
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("llm.get_key", return_value="test_llm_token"), \
+             patch("pathlib.Path.exists", return_value=False): # No env var or API file
+
+            # Run the command using llm_cli
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status", "--verbose"])
+
+            # Check the output
+            assert "GitHub Copilot authentication: ✓ Authenticated" in result.output
+            assert "GitHub Copilot User: testuser_llm" in result.output
+            assert "Access token: test_llm_token (from LLM key storage)" in result.output
+            assert "API key status: Not found or invalid" in result.output
+            assert result.exit_code == 0, f"CLI Error: {result.output}"
+
+    def test_status_verbose_expired_api_key(self, cli_runner, mock_authenticator):
+        """Test verbose status with an expired API key file."""
+        mock_authenticator.has_valid_credentials.return_value = True # Assume LLM key is still valid
+        mock_authenticator._get_github_user_info.return_value = {"login": "testuser_expired"}
+
+        # Mock API key file read with expired timestamp
+        expired_time = 1000000000 # Way in the past
+        mock_file_content = json.dumps({
+            "token": "expired_api_key",
+            "expires_at": expired_time
+        })
+
+        with patch("pathlib.Path.exists", return_value=True), \
+             patch("pathlib.Path.read_text", return_value=mock_file_content), \
+             patch("llm.get_key", return_value="valid_llm_token"): # Need a valid access token
+
+            # Run the command using llm_cli
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status", "--verbose"])
+
+            # Check the output
+            assert "GitHub Copilot authentication: ✓ Authenticated" in result.output
+            assert "GitHub Copilot User: testuser_expired" in result.output
+            assert "Access token: valid_llm_token (from LLM key storage)" in result.output
+            assert "API key:  <<expired, will refresh on next request>>" in result.output
+            assert result.exit_code == 0, f"CLI Error: {result.output}"
+
+    def test_status_verbose_user_fetch_fail(self, cli_runner, mock_authenticator):
+        """Test verbose status when fetching GitHub user info fails."""
+        mock_authenticator.has_valid_credentials.return_value = True
+        mock_authenticator._get_github_user_info.return_value = None # Simulate fetch failure
+
+        with patch("llm.get_key", return_value="valid_llm_token"), \
+             patch("pathlib.Path.exists", return_value=False): # No API file
+
+            # Run the command using llm_cli
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "status", "--verbose"])
+
+            # Check the output
+            assert "GitHub Copilot authentication: ✓ Authenticated" in result.output
+            assert "GitHub Copilot User: <unable to fetch>" in result.output
+            assert "Access token: valid_llm_token (from LLM key storage)" in result.output
+            assert "API key status: Not found or invalid" in result.output
+            assert result.exit_code == 0, f"CLI Error: {result.output}"
 
 
 class TestAuthRefresh:

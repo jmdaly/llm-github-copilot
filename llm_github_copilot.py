@@ -1269,7 +1269,7 @@ def register_commands(cli):
                 click.echo("Registered GitHub Copilot models:")
                 for model_id in github_model_ids:
                     click.echo(model_id)  # Removed leading "- "
-                return 0
+                return # Implicit exit 0
 
             # Fetch data if verbose or raw
             authenticator = GitHubCopilotAuthenticator()
@@ -1311,7 +1311,7 @@ def register_commands(cli):
             if raw:
                 # Print the raw JSON response, pretty-printed
                 click.echo(json.dumps(models_data, indent=2))
-                return 0
+                return # Implicit exit 0
 
             # Verbose output (-v)
             elif verbose:
@@ -1372,11 +1372,13 @@ def register_commands(cli):
                     # Add a blank line separator between models, but not after the last one
                     if i < len(github_model_ids) - 1:
                         click.echo()
-                # Successful verbose output
-                ctx = click.get_current_context()
-                ctx.exit(0)
+                # Successful verbose output, return normally
+                return # Implicit exit 0
 
         except Exception as e:
+            # Make sure not to catch click.exceptions.Exit
+            if isinstance(e, click.exceptions.Exit):
+                raise e
             click.echo(f"Error listing registered models: {str(e)}", err=True)
             # Explicitly return non-zero exit code for error
             ctx = click.get_current_context()

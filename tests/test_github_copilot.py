@@ -17,7 +17,7 @@ MOCK_RESPONSE_TEXT = "1. Captain\n2. Splash"
 @pytest.mark.vcr
 def test_prompt():
     """Test basic prompt functionality"""
-    model = llm.get_model("github-copilot")
+    model = llm.get_model("github_copilot")
 
     # Mock the authenticator to avoid actual API calls
     with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_API_KEY):
@@ -42,26 +42,26 @@ async def test_async_prompt():
 def test_model_variants():
     """Test that model variants are properly registered"""
     # Test that the default model exists
-    default_model = llm.get_model("github-copilot")
+    default_model = llm.get_model("github_copilot")
     assert default_model is not None
-    assert default_model.model_id == "github-copilot"
+    assert default_model.model_id == "github_copilot"
 
     # Test a variant model if it exists
-    with patch("llm_github_copilot.fetch_available_models", return_value={"github-copilot", "github-copilot/claude-3-7-sonnet"}):
+    with patch("llm_github_copilot.fetch_available_models", return_value={"github_copilot", "github_copilot/claude-3-7-sonnet"}):
         # Re-register models to pick up our mocked variants
         for hook in llm.get_plugins():
             if hasattr(hook, "register_models"):
                 hook.register_models(llm.register_model)
 
-        variant_model = llm.get_model("github-copilot/claude-3-7-sonnet")
+        variant_model = llm.get_model("github_copilot/claude-3-7-sonnet")
         assert variant_model is not None
-        assert variant_model.model_id == "github-copilot/claude-3-7-sonnet"
+        assert variant_model.model_id == "github_copilot/claude-3-7-sonnet"
 
 
 @pytest.mark.vcr
 def test_streaming_response():
     """Test streaming response functionality"""
-    model = llm.get_model("github-copilot")
+    model = llm.get_model("github_copilot")
 
     # Mock the authenticator to avoid actual API calls
     with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_API_KEY):
@@ -75,7 +75,7 @@ def test_streaming_response():
 @pytest.mark.vcr
 def test_options():
     """Test that options are properly passed to the API"""
-    model = llm.get_model("github-copilot")
+    model = llm.get_model("github_copilot")
 
     # Extract and test the options directly from the LLM prompt object
     with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_API_KEY):
@@ -121,21 +121,21 @@ def test_model_mappings():
     """Test the model mappings functionality"""
     # Create dummy mappings for testing
     test_mappings = {
-        "github-copilot": "gpt-4o",
-        "github-copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
+        "github_copilot": "gpt-4o",
+        "github_copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
     }
 
     # Directly patch the class attribute with our test data
     with patch.object(llm_github_copilot.GitHubCopilot, '_model_mappings', test_mappings):
-        model = llm.get_model("github-copilot")
+        model = llm.get_model("github_copilot")
 
         # Get the mappings - should return our test data directly
         mappings = model.get_model_mappings()
 
         # Check the mappings match what we set
-        assert "github-copilot" in mappings
-        assert mappings["github-copilot"] == "gpt-4o"
-        assert "github-copilot/claude-3-7-sonnet" in mappings
+        assert "github_copilot" in mappings
+        assert mappings["github_copilot"] == "gpt-4o"
+        assert "github_copilot/claude-3-7-sonnet" in mappings
 
 
 @pytest.mark.vcr
@@ -146,7 +146,7 @@ def test_get_streaming_models():
 
     # Directly patch the class attribute with our test data
     with patch.object(llm_github_copilot.GitHubCopilot, '_streaming_models', test_streaming_models):
-        model = llm.get_model("github-copilot")
+        model = llm.get_model("github_copilot")
 
         # Get the streaming models - should return our test data directly
         streaming_models = model.get_streaming_models()
@@ -159,33 +159,33 @@ def test_get_streaming_models():
 @pytest.mark.vcr
 def test_get_model_for_api():
     """Test the _get_model_for_api method"""
-    model = llm.get_model("github-copilot")
+    model = llm.get_model("github_copilot")
 
     # Create dummy mappings for testing
     test_mappings = {
-        "github-copilot": "gpt-4o",
-        "github-copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
+        "github_copilot": "gpt-4o",
+        "github_copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
     }
 
     # Patch the get_model_mappings method to return our test data
     with patch.object(GitHubCopilot, 'get_model_mappings', return_value=test_mappings):
         # Test with default model
-        api_model = model._get_model_for_api("github-copilot")
+        api_model = model._get_model_for_api("github_copilot")
         assert api_model == "gpt-4o"
 
         # Test with variant model
-        api_model = model._get_model_for_api("github-copilot/claude-3-7-sonnet")
+        api_model = model._get_model_for_api("github_copilot/claude-3-7-sonnet")
         assert api_model == "claude-3-7-sonnet"
 
         # Test with unknown model (should return default)
-        api_model = model._get_model_for_api("github-copilot/unknown-model")
+        api_model = model._get_model_for_api("github_copilot/unknown-model")
         assert api_model == "gpt-4o"
 
 
 @pytest.mark.vcr
 def test_build_conversation_messages():
     """Test the _build_conversation_messages method"""
-    model = llm.get_model("github-copilot")
+    model = llm.get_model("github_copilot")
 
     # Create a mock prompt
     mock_prompt = MagicMock()
@@ -220,7 +220,7 @@ def test_build_conversation_messages():
 @pytest.mark.vcr
 def test_non_streaming_request():
     """Test the _non_streaming_request method"""
-    model = llm.get_model("github-copilot")
+    model = llm.get_model("github_copilot")
 
     # Create mock objects
     mock_prompt = MagicMock()

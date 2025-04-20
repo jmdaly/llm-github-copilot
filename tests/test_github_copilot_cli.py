@@ -40,8 +40,8 @@ def test_register_commands():
         # Call the register_commands function directly
         llm_github_copilot.register_commands(mock_cli)
         
-        # Verify the github-copilot command group was registered
-        mock_cli.group.assert_called_with(name="github-copilot")
+        # Verify the github_copilot command group was registered
+        mock_cli.group.assert_called_with(name="github_copilot")
     except (AttributeError, ImportError):
         pytest.skip("llm-github-copilot plugin not properly loaded")
 
@@ -192,7 +192,7 @@ class TestAuthStatus:
                     if mock_authenticator.has_valid_credentials():
                         click.echo("GitHub Copilot authentication: ✓ Authenticated")
                         if verbose:
-                            access_token = llm.get_key("github-copilot", mock_authenticator.ACCESS_TOKEN_KEY)
+                            access_token = llm.get_key("github_copilot", mock_authenticator.ACCESS_TOKEN_KEY)
                             click.echo(f"Access token: {access_token} (from LLM key storage)")
                             api_key_info = json.loads(Path.read_text(mock_authenticator.api_key_file))
                             api_key = api_key_info.get("token", "")
@@ -219,7 +219,7 @@ class TestAuthRefresh:
             @click.option("-v", "--verbose", is_flag=True)
             def mock_refresh_command(verbose):
                 try:
-                    access_token = llm.get_key("github-copilot", mock_authenticator.ACCESS_TOKEN_KEY)
+                    access_token = llm.get_key("github_copilot", mock_authenticator.ACCESS_TOKEN_KEY)
                 except (TypeError, Exception):
                     access_token = None
                 
@@ -253,7 +253,7 @@ class TestAuthRefresh:
             @click.option("-v", "--verbose", is_flag=True)
             def mock_refresh_command(verbose):
                 try:
-                    access_token = llm.get_key("github-copilot", mock_authenticator.ACCESS_TOKEN_KEY)
+                    access_token = llm.get_key("github_copilot", mock_authenticator.ACCESS_TOKEN_KEY)
                 except (TypeError, Exception):
                     access_token = None
                 
@@ -296,7 +296,7 @@ class TestAuthLogout:
                     def mock_logout_command():
                         try:
                             # Check if token exists but don't try to delete it
-                            if llm.get_key("github-copilot", mock_authenticator.ACCESS_TOKEN_KEY):
+                            if llm.get_key("github_copilot", mock_authenticator.ACCESS_TOKEN_KEY):
                                 # Just log that we would delete it
                                 click.echo("Access token removed from LLM key storage.")
                         except Exception:

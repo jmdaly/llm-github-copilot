@@ -1246,7 +1246,9 @@ def register_commands(cli):
             click.echo(
                 "Error: Cannot use both -v and --raw flags simultaneously.", err=True
             )
-            return 1
+            # Explicitly return non-zero exit code for error
+            ctx = click.get_current_context()
+            ctx.exit(1)
 
         try:
             registered_llm_models = llm.get_models()
@@ -1279,9 +1281,13 @@ def register_commands(cli):
                     "Run 'llm github_copilot auth login' or set $GH_COPILOT_TOKEN/$GITHUB_COPILOT_TOKEN.",
                     err=True,
                 )
-                return 1
+                # Explicitly return non-zero exit code for error
+                ctx = click.get_current_context()
+                ctx.exit(1)
 
-            click.echo("Fetching detailed model information...")
+            # Only print fetching message if not raw
+            if not raw:
+                click.echo("Fetching detailed model information...")
             try:
                 models_data = _fetch_models_data(authenticator)
                 api_models_info = {
@@ -1289,10 +1295,17 @@ def register_commands(cli):
                 }
             except Exception as e:
                 click.echo(f"Error fetching model details from API: {str(e)}", err=True)
+                # If raw was requested, we cannot fulfill it, so exit with error
+                if raw:
+                    ctx = click.get_current_context()
+                    ctx.exit(1)
+                # Otherwise, show basic list and exit with error
                 click.echo("Showing basic registered model list instead:")
                 for model_id in github_model_ids:
                     click.echo(f"- {model_id}")
-                return 1  # Indicate partial failure
+                # Explicitly return non-zero exit code for error
+                ctx = click.get_current_context()
+                ctx.exit(1)
 
             # Raw output (--raw)
             if raw:
@@ -1359,8 +1372,12 @@ def register_commands(cli):
                     # Add a blank line separator between models, but not after the last one
                     if i < len(github_model_ids) - 1:
                         click.echo()
-                return 0
+                # Successful verbose output
+                ctx = click.get_current_context()
+                ctx.exit(0)
 
         except Exception as e:
             click.echo(f"Error listing registered models: {str(e)}", err=True)
-            return 1
+            # Explicitly return non-zero exit code for error
+            ctx = click.get_current_context()
+            ctx.exit(1)

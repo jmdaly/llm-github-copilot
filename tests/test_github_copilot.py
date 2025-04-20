@@ -293,7 +293,7 @@ def test_authenticator_get_access_token():
     authenticator = GitHubCopilotAuthenticator()
 
     # Test with environment variable
-    with patch.dict(os.environ, {"GH_COPILOT_KEY": "env_token"}):
+    with patch.dict(os.environ, {"GH_COPILOT_TOKEN": "env_token"}):
         assert authenticator.get_access_token() == "env_token"
 
     # Test with LLM key storage
@@ -307,4 +307,4 @@ def test_authenticator_get_access_token():
             with pytest.raises(Exception) as excinfo:
                 authenticator.get_access_token()
             assert "GitHub Copilot authentication required" in str(excinfo.value)
-            assert "llm github-copilot auth login" in str(excinfo.value)
+            assert "llm github_copilot auth login" in str(excinfo.value)

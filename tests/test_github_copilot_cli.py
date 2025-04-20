@@ -318,3 +318,150 @@ class TestAuthLogout:
                     
                     # Verify the mock was called
                     mock_unlink.assert_called_once()
+
+
+class TestModelsCommand:
+    """Tests for the 'models' command."""
+
+    @pytest.fixture
+    def mock_models_data(self):
+        """Fixture for mock API models data."""
+        return {
+            "data": [
+                {
+                    "id": "gpt-4o",
+                    "vendor": "OpenAI",
+                    "name": "GPT-4o",
+                    "version": "2024-05-13",
+                    "capabilities": {
+                        "limits": {"max_context_window_tokens": 128000},
+                        "family": "gpt-4",
+                        "supports": {"streaming": True},
+                    },
+                },
+                {
+                    "id": "claude-3-7-sonnet",
+                    "vendor": "Anthropic",
+                    "name": "Claude 3.7 Sonnet",
+                    "version": "2024-07-15",
+                    "capabilities": {
+                        "limits": {"max_context_window_tokens": 200000},
+                        "family": "claude-3",
+                        "supports": {"streaming": True},
+                    },
+                },
+            ]
+        }
+
+    @pytest.fixture
+    def mock_registered_models(self):
+        """Fixture for mock registered LLM models."""
+        model1 = MagicMock(spec=llm.Model)
+        model1.model_id = "github_copilot"
+        model2 = MagicMock(spec=llm.Model)
+        model2.model_id = "github_copilot/claude-3-7-sonnet"
+        other_model = MagicMock(spec=llm.Model)
+        other_model.model_id = "other-model"
+        return [model1, model2, other_model]
+
+    def test_models_default(self, cli_runner, mock_authenticator, mock_registered_models):
+        """Test the default 'models' command output."""
+        with patch("llm.get_models", return_value=mock_registered_models):
+            result = cli_runner.invoke(llm_github_copilot.models_command)
+            assert result.exit_code == 0
+            assert "Registered GitHub Copilot models:" in result.output
+            assert "github_copilot" in result.output
+            assert "github_copilot/claude-3-7-sonnet" in result.output
+            assert "other-model" not in result.output # Ensure non-copilot models aren't listed
+            assert "vendor:" not in result.output # Ensure verbose details aren't shown
+
+    def test_models_verbose_authenticated(self, cli_runner, mock_authenticator, mock_registered_models, mock_models_data):
+        """Test 'models --verbose' when authenticated."""
+        mock_authenticator.has_valid_credentials.return_value = True
+        with patch("llm.get_models", return_value=mock_registered_models), \
+             patch("llm_github_copilot._fetch_models_data", return_value=mock_models_data), \
+             patch("llm_github_copilot.GitHubCopilot.get_model_mappings", return_value={
+                 "github_copilot": "gpt-4o",
+                 "github_copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
+             }):
+            result = cli_runner.invoke(llm_github_copilot.models_command, ["--verbose"])
+            assert result.exit_code == 0
+            assert "Registered GitHub Copilot models (Verbose):" in result.output
+            assert "id: github_copilot" in result.output
+            assert "vendor: OpenAI" in result.output
+            assert "name: GPT-4o" in result.output
+            assert "context_length: 128,000" in result.output
+            assert "id: github_copilot/claude-3-7-sonnet" in result.output
+            assert "vendor: Anthropic" in result.output
+            assert "name: Claude 3.7 Sonnet" in result.output
+            assert "context_length: 200,000" in result.output
+
+    def test_models_raw_authenticated(self, cli_runner, mock_authenticator, mock_registered_models, mock_models_data):
+        """Test 'models --raw' when authenticated."""
+        mock_authenticator.has_valid_credentials.return_value = True
+        with patch("llm.get_models", return_value=mock_registered_models), \
+             patch("llm_github_copilot._fetch_models_data", return_value=mock_models_data):
+            result = cli_runner.invoke(llm_github_copilot.models_command, ["--raw"])
+            assert result.exit_code == 0
+            # Check if the output is valid JSON and contains expected keys
+            try:
+                output_json = json.loads(result.output)
+                assert "data" in output_json
+                assert len(output_json["data"]) == 2
+                assert output_json["data"][0]["id"] == "gpt-4o"
+            except json.JSONDecodeError:
+                pytest.fail("Output is not valid JSON")
+
+    def test_models_verbose_not_authenticated(self, cli_runner, mock_authenticator, mock_registered_models):
+        """Test 'models --verbose' when not authenticated."""
+        mock_authenticator.has_valid_credentials.return_value = False
+        with patch("llm.get_models", return_value=mock_registered_models):
+            result = cli_runner.invoke(llm_github_copilot.models_command, ["--verbose"])
+            assert result.exit_code == 1
+            assert "Authentication required for detailed model information." in result.output
+            assert "Run 'llm github_copilot auth login'" in result.output
+
+    def test_models_raw_not_authenticated(self, cli_runner, mock_authenticator, mock_registered_models):
+        """Test 'models --raw' when not authenticated."""
+        mock_authenticator.has_valid_credentials.return_value = False
+        with patch("llm.get_models", return_value=mock_registered_models):
+            result = cli_runner.invoke(llm_github_copilot.models_command, ["--raw"])
+            assert result.exit_code == 1
+            assert "Authentication required for detailed model information." in result.output
+
+    def test_models_verbose_api_error(self, cli_runner, mock_authenticator, mock_registered_models):
+        """Test 'models --verbose' when API fetch fails."""
+        mock_authenticator.has_valid_credentials.return_value = True
+        with patch("llm.get_models", return_value=mock_registered_models), \
+             patch("llm_github_copilot._fetch_models_data", side_effect=Exception("API Error")):
+            result = cli_runner.invoke(llm_github_copilot.models_command, ["--verbose"])
+            assert result.exit_code == 1
+            assert "Error fetching model details from API: API Error" in result.output
+            assert "Showing basic registered model list instead:" in result.output
+            assert "- github_copilot" in result.output # Check fallback output
+
+    def test_models_raw_api_error(self, cli_runner, mock_authenticator, mock_registered_models):
+        """Test 'models --raw' when API fetch fails."""
+        mock_authenticator.has_valid_credentials.return_value = True
+        with patch("llm.get_models", return_value=mock_registered_models), \
+             patch("llm_github_copilot._fetch_models_data", side_effect=Exception("API Error")):
+            result = cli_runner.invoke(llm_github_copilot.models_command, ["--raw"])
+            # Even with API error, raw should still require authentication check first
+            assert result.exit_code == 1 # Should fail because API error prevents raw output
+            assert "Error fetching model details from API: API Error" in result.output
+
+    def test_models_verbose_and_raw(self, cli_runner, mock_authenticator):
+        """Test using both --verbose and --raw flags."""
+        result = cli_runner.invoke(llm_github_copilot.models_command, ["--verbose", "--raw"])
+        assert result.exit_code == 1
+        assert "Error: Cannot use both -v and --raw flags simultaneously." in result.output
+
+    def test_models_no_models_registered(self, cli_runner, mock_authenticator):
+        """Test 'models' command when no GitHub Copilot models are registered."""
+        # Mock llm.get_models to return only non-copilot models
+        other_model = MagicMock(spec=llm.Model)
+        other_model.model_id = "other-model"
+        with patch("llm.get_models", return_value=[other_model]):
+            result = cli_runner.invoke(llm_github_copilot.models_command)
+            assert result.exit_code == 0
+            assert "No GitHub Copilot models are currently registered." in result.output

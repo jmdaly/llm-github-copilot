@@ -1,5 +1,6 @@
 import os
 import pytest
+from unittest.mock import patch
 
 # Configure pytest-asyncio
 def pytest_configure(config):
@@ -25,3 +26,11 @@ def vcr_config():
 @pytest.fixture(scope="module")
 def vcr_cassette_dir(request):
     return os.path.join(os.path.dirname(request.module.__file__), "cassettes")
+
+
+@pytest.fixture(autouse=True)
+def unset_copilot_env_vars():
+    """Fixture to automatically unset GitHub Copilot environment variables for tests."""
+    env_vars_to_clear = ["GH_COPILOT_TOKEN", "GITHUB_COPILOT_TOKEN"]
+    with patch.dict(os.environ, {var: "" for var in env_vars_to_clear}, clear=True):
+        yield

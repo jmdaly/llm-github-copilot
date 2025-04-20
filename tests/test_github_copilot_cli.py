@@ -368,7 +368,7 @@ class TestModelsCommand:
     def test_models_default(self, cli_runner, mock_authenticator, mock_registered_models):
         """Test the default 'models' command output."""
         with patch("llm.get_models", return_value=mock_registered_models):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models"]) # Use underscore
             assert result.exit_code == 0, f"CLI Error: {result.output}"
             assert "Registered GitHub Copilot models:" in result.output
             assert "github_copilot" in result.output
@@ -385,7 +385,7 @@ class TestModelsCommand:
                  "github_copilot": "gpt-4o",
                  "github_copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
              }):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models", "--verbose"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models", "--verbose"]) # Use underscore
             assert result.exit_code == 0, f"CLI Error: {result.output}"
             assert "Registered GitHub Copilot models (Verbose):" in result.output
             assert "id: github_copilot" in result.output
@@ -402,7 +402,7 @@ class TestModelsCommand:
         mock_authenticator.has_valid_credentials.return_value = True
         with patch("llm.get_models", return_value=mock_registered_models), \
              patch("llm_github_copilot._fetch_models_data", return_value=mock_models_data):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models", "--raw"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models", "--raw"]) # Use underscore
             assert result.exit_code == 0, f"CLI Error: {result.output}"
             # Check if the output is valid JSON and contains expected keys
             try:
@@ -417,16 +417,16 @@ class TestModelsCommand:
         """Test 'models --verbose' when not authenticated."""
         mock_authenticator.has_valid_credentials.return_value = False
         with patch("llm.get_models", return_value=mock_registered_models):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models", "--verbose"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models", "--verbose"]) # Use underscore
             assert result.exit_code == 1, f"CLI Error: {result.output}"
             assert "Authentication required for detailed model information." in result.output
-            assert "Run 'llm github-copilot auth login'" in result.output # Correct command name
+            assert "Run 'llm github_copilot auth login'" in result.output # Use underscore
 
     def test_models_raw_not_authenticated(self, cli_runner, mock_authenticator, mock_registered_models):
         """Test 'models --raw' when not authenticated."""
         mock_authenticator.has_valid_credentials.return_value = False
         with patch("llm.get_models", return_value=mock_registered_models):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models", "--raw"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models", "--raw"]) # Use underscore
             assert result.exit_code == 1, f"CLI Error: {result.output}"
             assert "Authentication required for detailed model information." in result.output
 
@@ -435,7 +435,7 @@ class TestModelsCommand:
         mock_authenticator.has_valid_credentials.return_value = True
         with patch("llm.get_models", return_value=mock_registered_models), \
              patch("llm_github_copilot._fetch_models_data", side_effect=Exception("API Error")):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models", "--verbose"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models", "--verbose"]) # Use underscore
             assert result.exit_code == 1, f"CLI Error: {result.output}"
             assert "Error fetching model details from API: API Error" in result.output
             assert "Showing basic registered model list instead:" in result.output
@@ -446,14 +446,14 @@ class TestModelsCommand:
         mock_authenticator.has_valid_credentials.return_value = True
         with patch("llm.get_models", return_value=mock_registered_models), \
              patch("llm_github_copilot._fetch_models_data", side_effect=Exception("API Error")):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models", "--raw"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models", "--raw"]) # Use underscore
             # Even with API error, raw should still require authentication check first
             assert result.exit_code == 1, f"CLI Error: {result.output}" # Should fail because API error prevents raw output
             assert "Error fetching model details from API: API Error" in result.output
 
     def test_models_verbose_and_raw(self, cli_runner, mock_authenticator):
         """Test using both --verbose and --raw flags."""
-        result = cli_runner.invoke(llm_cli, ["github-copilot", "models", "--verbose", "--raw"]) # Use llm_cli and correct command name
+        result = cli_runner.invoke(llm_cli, ["github_copilot", "models", "--verbose", "--raw"]) # Use underscore
         assert result.exit_code != 0, f"CLI Error: {result.output}" # Should exit with non-zero code
         assert "Error: Cannot use both -v and --raw flags simultaneously." in result.output
 
@@ -463,6 +463,6 @@ class TestModelsCommand:
         other_model = MagicMock(spec=llm.Model)
         other_model.model_id = "other-model"
         with patch("llm.get_models", return_value=[other_model]):
-            result = cli_runner.invoke(llm_cli, ["github-copilot", "models"]) # Use llm_cli and correct command name
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "models"]) # Use underscore
             assert result.exit_code == 0, f"CLI Error: {result.output}"
             assert "No GitHub Copilot models are currently registered." in result.output

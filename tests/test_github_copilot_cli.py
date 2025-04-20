@@ -68,7 +68,7 @@ class TestAuthLogin:
         assert result.exit_code == 0
     
     def test_login_with_env_var(self, cli_runner, mock_authenticator):
-        """Test login with GH_COPILOT_KEY environment variable set."""
+        """Test login with GH_COPILOT_TOKEN environment variable set."""
         # Setup mock for environment variable
         with patch.dict(os.environ, {"GH_COPILOT_TOKEN": "test_token"}):
             # Setup mock to indicate not authenticated

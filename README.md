@@ -144,6 +144,6 @@ pytest
 If you want to record new VCR cassettes for tests, set your API key:
 
 ```bash
-export PYTEST_GITHUB_COPILOT_API_KEY=your_api_key_here
+export PYTEST_GITHUB_COPILOT_TOKEN=your_token_here
 pytest --vcr-record=new_episodes
 ```

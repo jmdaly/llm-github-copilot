@@ -8,7 +8,7 @@ from llm_github_copilot import GitHubCopilot, GitHubCopilotAuthenticator
 import httpx
 
 # Mock API key for testing
-GITHUB_COPILOT_API_KEY = os.environ.get("PYTEST_GITHUB_COPILOT_API_KEY", None) or "ghu_mocktoken"
+GITHUB_COPILOT_TOKEN = os.environ.get("PYTEST_GITHUB_COPILOT_TOKEN", None) or "ghu_mocktoken"
 
 # Mock response data
 MOCK_RESPONSE_TEXT = "1. Captain\n2. Splash"
@@ -20,7 +20,7 @@ def test_prompt():
     model = llm.get_model("github_copilot")
 
     # Mock the authenticator to avoid actual API calls
-    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_API_KEY):
+    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_TOKEN):
         # Mock the execute method directly
         with patch.object(model, 'execute', return_value=iter([MOCK_RESPONSE_TEXT])):
             # Test the prompt
@@ -64,7 +64,7 @@ def test_streaming_response():
     model = llm.get_model("github_copilot")
 
     # Mock the authenticator to avoid actual API calls
-    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_API_KEY):
+    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_TOKEN):
         # Mock the _handle_streaming_request method
         with patch.object(GitHubCopilot, '_handle_streaming_request', return_value=iter([MOCK_RESPONSE_TEXT])):
             # Test streaming response
@@ -78,7 +78,7 @@ def test_options():
     model = llm.get_model("github_copilot")
 
     # Extract and test the options directly from the LLM prompt object
-    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_API_KEY):
+    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_TOKEN):
         # Create a function to return our mock response but also capture the call args
         def mock_response_generator(*args, **kwargs):
             return iter([MOCK_RESPONSE_TEXT])
@@ -105,7 +105,7 @@ def test_authenticator(tmp_path):
     authenticator = llm_github_copilot.GitHubCopilotAuthenticator()
 
     mock_auth_file = tmp_path / "auth.json"
-    mock_data = {"token": GITHUB_COPILOT_API_KEY, "expires_at": 9999999999}
+    mock_data = {"token": GITHUB_COPILOT_TOKEN, "expires_at": 9999999999}
     mock_auth_file.write_text(json.dumps(mock_data))
     authenticator.api_key_file = mock_auth_file
 
@@ -113,7 +113,7 @@ def test_authenticator(tmp_path):
     api_key = authenticator.get_api_key()
 
     # Verify we got the expected token
-    assert api_key == GITHUB_COPILOT_API_KEY
+    assert api_key == GITHUB_COPILOT_TOKEN
 
 
 @pytest.mark.vcr
@@ -224,7 +224,7 @@ def test_non_streaming_request():
 
     # Create mock objects
     mock_prompt = MagicMock()
-    mock_headers = {"Authorization": f"Bearer {GITHUB_COPILOT_API_KEY}"}
+    mock_headers = {"Authorization": f"Bearer {GITHUB_COPILOT_TOKEN}"}
     mock_payload = {
         "model": "gpt-4o",
         "messages": [{"role": "user", "content": "Hello"}],
@@ -266,7 +266,7 @@ def test_authenticator_has_valid_credentials():
     # Test with valid API key file
     with patch("pathlib.Path.exists", return_value=True):
         with patch("pathlib.Path.read_text", return_value=json.dumps({
-            "token": GITHUB_COPILOT_API_KEY,
+            "token": GITHUB_COPILOT_TOKEN,
             "expires_at": 9999999999
         })):
             assert authenticator.has_valid_credentials() is True
@@ -274,7 +274,7 @@ def test_authenticator_has_valid_credentials():
     # Test with expired API key file
     with patch("pathlib.Path.exists", return_value=True):
         with patch("pathlib.Path.read_text", return_value=json.dumps({
-            "token": GITHUB_COPILOT_API_KEY,
+            "token": GITHUB_COPILOT_TOKEN,
             "expires_at": 1000000000
         })):
             # Also mock llm.get_key to return a valid token

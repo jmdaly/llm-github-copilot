@@ -970,7 +970,7 @@ def register_commands(cli):
     @cli.group(name="github_copilot")
     def github_copilot_group():
         """
-        Commands for managing GitHub Copilot plugin.
+        Commands relating to the llm-github_copilot plugin
 
         By default github_copilot will use the following in precedence order to obtain an access_token for communication :
             $GH_COPILOT_KEY
@@ -1266,10 +1266,9 @@ def register_commands(cli):
 
             # Default output (no flags)
             if not verbose and not raw:
-                click.echo("Registered GitHub Copilot models:")
                 for model_id in github_model_ids:
                     click.echo(model_id)  # Removed leading "- "
-                return # Implicit exit 0
+                return  # Implicit exit 0
 
             # Fetch data if verbose or raw
             authenticator = GitHubCopilotAuthenticator()
@@ -1311,11 +1310,10 @@ def register_commands(cli):
             if raw:
                 # Print the raw JSON response, pretty-printed
                 click.echo(json.dumps(models_data, indent=2))
-                return # Implicit exit 0
+                return  # Implicit exit 0
 
             # Verbose output (-v)
             elif verbose:
-                click.echo("Registered GitHub Copilot models (Verbose):")
                 model_mappings = GitHubCopilot.get_model_mappings()
 
                 for i, model_id in enumerate(github_model_ids):
@@ -1373,7 +1371,7 @@ def register_commands(cli):
                     if i < len(github_model_ids) - 1:
                         click.echo()
                 # Successful verbose output, return normally
-                return # Implicit exit 0
+                return  # Implicit exit 0
 
         except Exception as e:
             # Make sure not to catch click.exceptions.Exit

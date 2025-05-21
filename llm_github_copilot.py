@@ -1314,6 +1314,7 @@ def register_commands(cli):
 
             # Verbose output (-v)
             elif verbose:
+                click.echo("Registered GitHub Copilot models (Verbose):")
                 model_mappings = GitHubCopilot.get_model_mappings()
 
                 for i, model_id in enumerate(github_model_ids):

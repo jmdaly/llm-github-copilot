@@ -145,6 +145,7 @@ class GitHubCopilotAuthenticator:
 
     # Key identifiers for LLM key storage
     ACCESS_TOKEN_KEY = "github_copilot_access_token"
+    DEFAULT_KEYS_JSON_CONTENT = {"// Note": "This file stores secret API credentials. Do not share!"}
 
     def __init__(self) -> None:
         # Token storage paths for API key (still using file for this)
@@ -168,24 +169,41 @@ class GitHubCopilotAuthenticator:
         Note:
             This method does not attempt to refresh or obtain new credentials.
         """
+        # Order of checks:
+        # 1. Valid (non-expired, token exists and is non-empty) API key file
+        # 2. Environment variables for access token
+        # 3. LLM-stored access token (non-empty)
+
+        # Check 1: API Key File
         try:
-            # Check if we have a valid API key
             if self.api_key_file.exists():
                 api_key_info = json.loads(self.api_key_file.read_text())
-                if api_key_info.get("expires_at", 0) > datetime.now().timestamp():
+                # Ensure api_key_info is a dict, token exists and is not empty, and is not expired
+                if isinstance(api_key_info, dict) and \
+                   api_key_info.get("token") and \
+                   isinstance(api_key_info.get("token"), str) and \
+                   api_key_info.get("token").strip() and \
+                   api_key_info.get("expires_at", 0) > datetime.now().timestamp():
                     return True
+        except (FileNotFoundError, json.JSONDecodeError, KeyError, AttributeError, TypeError):
+            # Ignore errors related to API key file processing, proceed to next checks
+            pass
 
-            # Check if we have a valid access token that we can use to get an API key
-            try:
-                access_token = llm.get_key("github_copilot", self.ACCESS_TOKEN_KEY)
-                if access_token:
-                    return True
-            except (TypeError, Exception):
-                pass
+        # Check 2: Environment Variables
+        for env_var in ["GH_COPILOT_TOKEN", "GITHUB_COPILOT_TOKEN"]:
+            env_token = os.environ.get(env_var)
+            if env_token and env_token.strip():
+                return True
 
-            return False
-        except (FileNotFoundError, json.JSONDecodeError, KeyError):
-            return False
+        # Check 3: LLM-stored Access Token
+        try:
+            access_token = llm.get_key(None, self.ACCESS_TOKEN_KEY)
+            if access_token and isinstance(access_token, str) and access_token.strip():
+                return True
+        except Exception: # Catching broad exception from llm.get_key if it fails
+            pass
+
+        return False
 
     def _get_github_headers(self, access_token: Optional[str] = None) -> dict[str, str]:
         """
@@ -222,10 +240,10 @@ class GitHubCopilotAuthenticator:
 
         # Try to read existing token from LLM key storage
         try:
-            access_token = llm.get_key("github_copilot", self.ACCESS_TOKEN_KEY)
+            access_token = llm.get_key(None, self.ACCESS_TOKEN_KEY)
             if access_token:
                 return access_token
-        except (TypeError, Exception):
+        except Exception:
             pass
 
         # No valid token found, inform user they need to authenticate
@@ -1032,14 +1050,31 @@ def register_commands(cli):
 
                 # Save the access token to LLM key storage
                 try:
-                    llm.set_key(
-                        "github_copilot", authenticator.ACCESS_TOKEN_KEY, access_token
-                    )
-                    click.echo(f"Access token: {access_token}")
-                except TypeError:
-                    click.echo(
-                        "Warning: Unable to save token to LLM key storage (incompatible LLM version)"
-                    )
+                    keys_path = llm.user_dir() / "keys.json"
+                    key_name_to_set = authenticator.ACCESS_TOKEN_KEY
+                    
+                    current_keys = {}
+                    if keys_path.exists():
+                        try:
+                            current_keys = json.loads(keys_path.read_text())
+                            if not isinstance(current_keys, dict):
+                                current_keys = authenticator.DEFAULT_KEYS_JSON_CONTENT.copy()
+                        except json.JSONDecodeError:
+                            click.echo(f"Warning: {keys_path} is not valid JSON. Initializing a new one.", err=True)
+                            current_keys = authenticator.DEFAULT_KEYS_JSON_CONTENT.copy()
+                    else:
+                        current_keys = authenticator.DEFAULT_KEYS_JSON_CONTENT.copy()
+
+                    current_keys[key_name_to_set] = access_token
+                    
+                    keys_path.parent.mkdir(parents=True, exist_ok=True)
+                    keys_path.write_text(json.dumps(current_keys, indent=2) + "\n")
+                    if not keys_path.exists(): # Should not happen if write_text is successful
+                         keys_path.chmod(0o600) # Set permissions if file was newly created by write_text
+                    
+                    click.echo(f"Access token saved: {access_token}")
+                except Exception as e:
+                    click.echo(f"Error saving access token to LLM key storage: {str(e)}")
 
             # Get the API key
             api_key_info = authenticator._refresh_api_key()
@@ -1101,21 +1136,18 @@ def register_commands(cli):
                         # Check LLM key storage
                         try:
                             access_token = llm.get_key(
-                                "github_copilot", authenticator.ACCESS_TOKEN_KEY
+                                None, authenticator.ACCESS_TOKEN_KEY
                             )
                             if access_token:
                                 click.echo(
                                     f"Access token: {access_token} (from LLM key storage)"
                                 )
                             else:
-                                click.echo("Access token: Not found")
-                        except TypeError:
-                            # Fallback for older LLM versions
-                            click.echo(
-                                "Access token: Unable to retrieve from LLM key storage (incompatible LLM version)"
-                            )
-                except Exception as e:
-                    click.echo(f"Error retrieving access token: {str(e)}")
+                                click.echo("Access token: Not found in LLM key storage")
+                        except Exception as e: # Catching broad exception from llm.get_key if it fails
+                            click.echo(f"Error retrieving access token from LLM key storage: {str(e)}")
+                except Exception as e: # General exception for the outer try block
+                    click.echo(f"Error displaying access token status: {str(e)}")
 
             # Check if we have a valid API key
             try:
@@ -1161,9 +1193,9 @@ def register_commands(cli):
             # Check if we have an access token
             try:
                 access_token = llm.get_key(
-                    "github_copilot", authenticator.ACCESS_TOKEN_KEY
+                    None, authenticator.ACCESS_TOKEN_KEY
                 )
-            except (TypeError, Exception):
+            except Exception:
                 access_token = None
 
             if not access_token and not (
@@ -1214,13 +1246,38 @@ def register_commands(cli):
 
         # Remove access token from LLM key storage
         try:
-            if llm.get_key("github_copilot", authenticator.ACCESS_TOKEN_KEY):
-                llm.delete_key("github_copilot", authenticator.ACCESS_TOKEN_KEY)
+            keys_path = llm.user_dir() / "keys.json"
+            key_name_to_remove = authenticator.ACCESS_TOKEN_KEY
+            
+            key_existed_and_removed = False
+            if keys_path.exists():
+                current_keys = {}
+                try:
+                    current_keys = json.loads(keys_path.read_text())
+                    if not isinstance(current_keys, dict):
+                        # Handle case where keys.json is not a dict (e.g. corrupted)
+                        # or if it's empty and loads as None or other non-dict type
+                        current_keys = {}
+                except json.JSONDecodeError:
+                    # If file is malformed, treat as if key wasn't there or handle error
+                    click.echo(f"Warning: {keys_path} is not valid JSON.", err=True)
+                    current_keys = {} # Or re-raise, or return, depending on desired strictness
+
+                if key_name_to_remove in current_keys:
+                    del current_keys[key_name_to_remove]
+                    # Ensure the // Note comment is preserved if it exists and keys become empty
+                    if not current_keys and "// Note" in getattr(GitHubCopilotAuthenticator, "DEFAULT_KEYS_JSON_CONTENT", {}):
+                         current_keys["// Note"] = GitHubCopilotAuthenticator.DEFAULT_KEYS_JSON_CONTENT["// Note"]
+
+                    keys_path.write_text(json.dumps(current_keys, indent=2) + "\n")
+                    key_existed_and_removed = True
+            
+            if key_existed_and_removed:
                 click.echo("Access token removed from LLM key storage.")
-        except TypeError:
-            click.echo(
-                "Warning: Unable to access LLM key storage (incompatible LLM version)"
-            )
+            # If you want to inform the user that the key was not found, uncomment below:
+            # else:
+            #     click.echo("Access token not found in LLM key storage.")
+
         except Exception as e:
             click.echo(f"Error removing access token: {str(e)}")
 

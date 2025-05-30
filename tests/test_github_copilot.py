@@ -55,6 +55,9 @@ def test_model_variants():
     with patch(
         "llm_github_copilot.fetch_available_models",
         return_value={"github_copilot", "github_copilot/o3-mini"},
+    ), patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
+        return_value=True,
     ):
         # Re-register models to pick up our mocked variants
         for hook in llm.get_plugins():

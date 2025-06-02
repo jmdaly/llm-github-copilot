@@ -418,9 +418,13 @@ class GitHubCopilotAuthenticator:
 
         return self._poll_for_access_token(device_code)
 
-    def _refresh_api_key(self) -> dict[str, Any]:
+    def _refresh_api_key(self, access_token_override: Optional[str] = None) -> dict[str, Any]:
         """
         Refresh the API key using the access token.
+
+        Args:
+            access_token_override: If provided, use this access token instead of
+                                   calling get_access_token().
 
         This method exchanges a GitHub access token for a GitHub Copilot API key
         by making a request to the GitHub Copilot API. It includes retry logic
@@ -433,7 +437,7 @@ class GitHubCopilotAuthenticator:
         Raises:
             Exception: If the API key cannot be refreshed after maximum retries
         """
-        access_token = self.get_access_token()
+        access_token = access_token_override or self.get_access_token()
         headers = self._get_github_headers(access_token)
 
         max_retries = 3
@@ -465,16 +469,20 @@ class GitHubCopilotAuthenticator:
 
         raise Exception("Failed to refresh API key after maximum retries")
 
-    def _get_github_user_info(self) -> Optional[dict[str, Any]]:
+    def _get_github_user_info(self, access_token_override: Optional[str] = None) -> Optional[dict[str, Any]]:
         """
         Fetch user information from GitHub API using the access token.
+
+        Args:
+            access_token_override: If provided, use this access token instead of
+                                   calling get_access_token().
 
         Returns:
             dict[str, Any]: Dictionary containing user information (e.g., login)
                             or None if fetching fails.
         """
         try:
-            access_token = self.get_access_token()
+            access_token = access_token_override or self.get_access_token()
             headers = self._get_github_headers(access_token)
             client = httpx.Client()
             response = client.get(
@@ -1008,7 +1016,10 @@ def register_commands(cli):
     @click.option(
         "-f", "--force", is_flag=True, help="Force login even if already authenticated"
     )
-    def login_command(force):
+    @click.option(
+        "--show-only", is_flag=True, help="Perform login but only display tokens, do not save them"
+    )
+    def login_command(force, show_only):
         """
         Authenticate with GitHub Copilot to generate a new access token.
         """
@@ -1046,50 +1057,84 @@ def register_commands(cli):
                 click.echo(
                     "Starting GitHub Copilot login process to obtain an access_token & API key..."
                 )
-                access_token = authenticator._login()
+                access_token = authenticator._login() # This performs the device flow
 
-                # Save the access token to LLM key storage
-                try:
-                    keys_path = llm.user_dir() / "keys.json"
-                    key_name_to_set = authenticator.ACCESS_TOKEN_KEY
+                # Get the API key using the newly obtained access_token
+                api_key_info = authenticator._refresh_api_key(access_token_override=access_token)
+
+                if show_only:
+                    user_info = authenticator._get_github_user_info(access_token_override=access_token)
+                    user_login = "<unable to fetch>"
+                    if user_info and "login" in user_info:
+                        user_login = user_info['login']
                     
-                    current_keys = {}
-                    if keys_path.exists():
-                        try:
-                            current_keys = json.loads(keys_path.read_text())
-                            if not isinstance(current_keys, dict):
+                    api_key_value = api_key_info.get("token", "<not available>")
+                    expires_at = api_key_info.get("expires_at", 0)
+                    expiry_date_str = "never"
+                    if expires_at > 0:
+                        expiry_date_str = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+
+                    click.echo("GitHub Copilot: ✓ Authenticated")
+                    click.echo(f"          User: {user_login}")
+                    click.echo(f"   AccessToken: Valid")
+                    click.echo(f"   AccessToken: {access_token}")
+                    click.echo(f"       API Key: Valid, expires {expiry_date_str}")
+                    click.echo(f"       API key: {api_key_value}")
+                    click.echo("")
+                    click.echo("You can set GH_COPILOT_TOKEN or GITHUB_COPILOT_TOKEN to the token value above.")
+                    click.echo("Note: These tokens have NOT been saved to the LLM keystore or API key file.")
+
+                else: # Save the tokens
+                    # Save the access token to LLM key storage
+                    try:
+                        keys_path = llm.user_dir() / "keys.json"
+                        key_name_to_set = authenticator.ACCESS_TOKEN_KEY
+                        
+                        current_keys = {}
+                        if keys_path.exists():
+                            try:
+                                current_keys = json.loads(keys_path.read_text())
+                                if not isinstance(current_keys, dict):
+                                    current_keys = authenticator.DEFAULT_KEYS_JSON_CONTENT.copy()
+                            except json.JSONDecodeError:
+                                click.echo(f"Warning: {keys_path} is not valid JSON. Initializing a new one.", err=True)
                                 current_keys = authenticator.DEFAULT_KEYS_JSON_CONTENT.copy()
-                        except json.JSONDecodeError:
-                            click.echo(f"Warning: {keys_path} is not valid JSON. Initializing a new one.", err=True)
+                        else:
                             current_keys = authenticator.DEFAULT_KEYS_JSON_CONTENT.copy()
-                    else:
-                        current_keys = authenticator.DEFAULT_KEYS_JSON_CONTENT.copy()
 
-                    current_keys[key_name_to_set] = access_token
-                    
-                    keys_path.parent.mkdir(parents=True, exist_ok=True)
-                    keys_path.write_text(json.dumps(current_keys, indent=2) + "\n")
-                    if not keys_path.exists(): # Should not happen if write_text is successful
-                         keys_path.chmod(0o600) # Set permissions if file was newly created by write_text
-                    
-                    click.echo(f"Access token saved: {access_token}")
-                except Exception as e:
-                    click.echo(f"Error saving access token to LLM key storage: {str(e)}")
+                        current_keys[key_name_to_set] = access_token
+                        
+                        keys_path.parent.mkdir(parents=True, exist_ok=True)
+                        keys_path.write_text(json.dumps(current_keys, indent=2) + "\n")
+                        # Ensure correct permissions if file was newly created by write_text
+                        # (chmod might not be needed if umask is set correctly, but explicit is safer)
+                        if not os.access(keys_path, os.R_OK | os.W_OK): # Basic check, could be more robust
+                             try:
+                                 keys_path.chmod(0o600)
+                             except OSError as e:
+                                 click.echo(f"Warning: Could not set permissions on {keys_path}: {e}", err=True)
+                        
+                        click.echo(f"Access token saved: {access_token}")
+                    except Exception as e:
+                        click.echo(f"Error saving access token to LLM key storage: {str(e)}")
 
-            # Get the API key
-            api_key_info = authenticator._refresh_api_key()
-            authenticator.api_key_file.write_text(
-                json.dumps(api_key_info), encoding="utf-8"
-            )
-            authenticator.api_key_file.chmod(0o600)
+                    # Save the API key
+                    authenticator.api_key_file.write_text(
+                        json.dumps(api_key_info), encoding="utf-8"
+                    )
+                    try:
+                        authenticator.api_key_file.chmod(0o600)
+                    except OSError as e:
+                        click.echo(f"Warning: Could not set permissions on {authenticator.api_key_file}: {e}", err=True)
 
-            click.echo("GitHub Copilot login process completed successfully!")
-            click.echo("")
 
-            # Fetch available models
-            click.echo("Fetching available models...")
-            models = fetch_available_models(authenticator)
-            click.echo(f"Available models: {', '.join(models)}")
+                    click.echo("GitHub Copilot login process completed successfully!")
+                    click.echo("")
+
+                    # Fetch available models
+                    click.echo("Fetching available models...")
+                    models = fetch_available_models(authenticator)
+                    click.echo(f"Available models: {', '.join(models)}")
 
         except Exception as e:
             click.echo(f"Error during authentication: {str(e)}", err=True)
@@ -1104,77 +1149,79 @@ def register_commands(cli):
         Check GitHub Copilot authentication status.
         """
         authenticator = GitHubCopilotAuthenticator()
+        is_authenticated = authenticator.has_valid_credentials()
 
-        if authenticator.has_valid_credentials():
-            click.echo("GitHub Copilot authentication: ✓ Authenticated")
+        if is_authenticated:
+            click.echo("GitHub Copilot: ✓ Authenticated")
 
-            # Fetch and display GitHub user info
-            user_info = authenticator._get_github_user_info()
-            if user_info and "login" in user_info:
-                click.echo(f"GitHub Copilot User: {user_info['login']}")
-            else:
-                click.echo("GitHub Copilot User: <unable to fetch>")
-
-            # Only display the access token if verbose mode is enabled
-            if verbose:
-                try:
-                    # Check environment variables first
-                    env_var_used = None
-                    env_token = None
-                    for env_var in ["GH_COPILOT_TOKEN", "GITHUB_COPILOT_TOKEN"]:
-                        token = os.environ.get(env_var)
-                        if token and token.strip():
-                            env_var_used = env_var
-                            env_token = token.strip()
-                            break
-
-                    if env_token:
-                        click.echo(
-                            f"Access token: {env_token} (from environment variable {env_var_used})"
-                        )
-                    else:
-                        # Check LLM key storage
-                        try:
-                            access_token = llm.get_key(
-                                None, authenticator.ACCESS_TOKEN_KEY
-                            )
-                            if access_token:
-                                click.echo(
-                                    f"Access token: {access_token} (from LLM key storage)"
-                                )
-                            else:
-                                click.echo("Access token: Not found in LLM key storage")
-                        except Exception as e: # Catching broad exception from llm.get_key if it fails
-                            click.echo(f"Error retrieving access token from LLM key storage: {str(e)}")
-                except Exception as e: # General exception for the outer try block
-                    click.echo(f"Error displaying access token status: {str(e)}")
-
-            # Check if we have a valid API key
+            # API Key Status
+            api_key_status_message = "       API Key: "
+            api_key_value_for_verbose = None
             try:
                 api_key_info = json.loads(authenticator.api_key_file.read_text())
+                api_key_value_for_verbose = api_key_info.get("token", "")
                 expires_at = api_key_info.get("expires_at", 0)
-                if expires_at > datetime.now().timestamp():
-                    # Only show API key expiration in verbose mode
-                    if verbose:
-                        expiry_date = datetime.fromtimestamp(expires_at).strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                        click.echo(f"API key expires: {expiry_date}")
-
-                        # Show the API key in verbose mode
-                        api_key = api_key_info.get("token", "")
-                        click.echo(f"API key: {api_key}")
+                if api_key_value_for_verbose and expires_at > datetime.now().timestamp():
+                    expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                    api_key_status_message += f"Valid, expires {expiry_date}"
                 else:
-                    if verbose:
-                        click.echo(
-                            "API key:  <<expired, will refresh on next request>>"
-                        )
-            except (FileNotFoundError, json.JSONDecodeError, KeyError):
-                click.echo("API key status: Not found or invalid")
+                    api_key_status_message += "Expired, will refresh on next request"
+            except (FileNotFoundError, json.JSONDecodeError, KeyError, AttributeError):
+                api_key_status_message += "Not found or invalid"
+            click.echo(api_key_status_message)
 
-            # Don't display available models in status command
-        else:
-            click.echo("GitHub Copilot authentication: ✗ Not authenticated")
+            # Access Token Status
+            access_token_status_message = "   AccessToken: "
+            access_token_value_for_verbose = None
+            env_var_used = None # Define env_var_used here to be available for verbose block
+            for env_var_ghc in ["GH_COPILOT_TOKEN", "GITHUB_COPILOT_TOKEN"]: # Renamed to avoid conflict
+                token = os.environ.get(env_var_ghc)
+                if token and token.strip():
+                    env_var_used = env_var_ghc
+                    access_token_value_for_verbose = token.strip()
+                    break
+            
+            _access_token_status_part = "Not found in keystore" # Default
+            if env_var_used:
+                _access_token_status_part = f"Valid, via env {env_var_used}"
+            else:
+                try:
+                    stored_token = llm.get_key(None, authenticator.ACCESS_TOKEN_KEY)
+                    if stored_token:
+                        access_token_value_for_verbose = stored_token # Ensure this is set if from keystore
+                        _access_token_status_part = f"Valid, via keystore {authenticator.ACCESS_TOKEN_KEY}"
+                    # else: it remains "Not found in keystore"
+                except Exception:
+                    _access_token_status_part = "Error checking keystore"
+            access_token_status_message += _access_token_status_part
+
+
+            if verbose:
+                # GitHub User Info
+                user_info = authenticator._get_github_user_info()
+                user_login = "<unable to fetch>"
+                if user_info and "login" in user_info:
+                    user_login = user_info['login']
+                click.echo(f"          User: {user_login}")
+
+                # AccessToken Status and Value
+                # access_token_status_message is like "   AccessToken: Valid, via keystore ..."
+                # We want the part after "   AccessToken: "
+                parsed_access_token_status_part = access_token_status_message.split("   AccessToken: ", 1)[1]
+                click.echo(f"   AccessToken: {parsed_access_token_status_part}")
+                click.echo(f"   AccessToken: {access_token_value_for_verbose or 'Not available'}")
+                
+                # API Key Status and Value
+                # api_key_status_message is like "       API Key: Valid, expires ..."
+                # We want the part after "       API Key: "
+                parsed_api_key_status_part = api_key_status_message.split("       API Key: ", 1)[1]
+                click.echo(f"       API Key: {parsed_api_key_status_part}")
+                click.echo(f"       API key: {api_key_value_for_verbose or 'Not available'}")
+            else: # Not verbose, print the pre-formatted status messages
+                click.echo(access_token_status_message)
+
+        else: # This 'else' is for 'if is_authenticated:'
+            click.echo("GitHub Copilot: ✗ Not authenticated")
             click.echo(
                 "Run 'llm github_copilot auth login' to authenticate or set $GH_COPILOT_TOKEN or $GITHUB_COPILOT_TOKEN."
             )

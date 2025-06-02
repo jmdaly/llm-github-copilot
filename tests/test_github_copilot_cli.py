@@ -135,6 +135,49 @@ class TestAuthLogin:
                 "GitHub Copilot login process completed successfully!" in result.output
             )
             assert "Available models:" in result.output
+            assert result.exit_code == 0, f"CLI Error: {result.output}"
+
+    def test_login_show_only(self, cli_runner, mock_authenticator):
+        """Test successful login with --show-only."""
+        # Setup mocks
+        mock_authenticator.has_valid_credentials.return_value = False
+        mock_authenticator._login.return_value = "mock_access_token_show_only"
+        mock_authenticator._refresh_api_key.return_value = {
+            "token": "mock_api_key_show_only",
+            "expires_at": 9999999999, # Far future expiry: 2286-11-20 17:46:39 UTC
+        }
+        mock_authenticator._get_github_user_info.return_value = {"login": "testuser_show_only"}
+
+        # Mock file writing operations to ensure they are NOT called
+        with patch("llm.user_dir") as mock_user_dir, \
+             patch("pathlib.Path.write_text") as mock_write_text, \
+             patch("pathlib.Path.chmod") as mock_chmod:
+            
+            # Mock keys.json path for llm.set_key equivalent logic
+            mock_keys_path = MagicMock()
+            mock_user_dir.return_value.joinpath.return_value = mock_keys_path
+            mock_keys_path.exists.return_value = False # Simulate no existing keys.json
+
+            # Run the command using llm_cli
+            result = cli_runner.invoke(llm_cli, ["github_copilot", "auth", "login", "--show-only"])
+
+            # Check the output
+            assert "GitHub Copilot: ✓ Authenticated" in result.output
+            assert "User: testuser_show_only" in result.output
+            assert "AccessToken: Valid" in result.output # General status
+            assert "AccessToken: mock_access_token_show_only" in result.output # Actual token
+            assert "API Key: Valid, expires 2286-11-20 17:46:39" in result.output
+            assert "API key: mock_api_key_show_only" in result.output
+            assert "Note: These tokens have NOT been saved" in result.output
+            
+            # Ensure no file writing operations were called for saving tokens
+            mock_write_text.assert_not_called()
+            mock_chmod.assert_not_called()
+            # Specifically check that the authenticator's api_key_file was not written to
+            # This requires a bit more specific mocking if Path.write_text is too general
+            # For now, the general mock_write_text.assert_not_called() covers it.
+
+            assert result.exit_code == 0, f"CLI Error: {result.output}"
 
 
 class TestAuthStatus:

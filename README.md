@@ -60,6 +60,7 @@ Usage: llm github_copilot auth login [OPTIONS]
 
 Options:
   -f, --force  Force login even if already authenticated
+  --show-only  Perform login but only display tokens, do not save them
   --help       Show this message and exit.
 ```
 
@@ -76,6 +77,26 @@ You can force a new login and obtain a new access_token even if already authenti
 
 ```bash
 llm github_copilot auth login --force
+```
+
+You can also perform the login process and display the obtained access token and API key without saving them to the LLM keystore or the API key file. This is useful if you want to manually manage these tokens or use them in environment variables:
+```bash
+llm github_copilot auth login --show-only
+```
+This will output something like:
+```
+GitHub Copilot: ✓ Authenticated
+          User: your_github_username
+   AccessToken: Valid
+   AccessToken: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+       API Key: Valid, expires YYYY-MM-DD HH:MM:SS
+       API key: yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+You can set GH_COPILOT_TOKEN or GITHUB_COPILOT_TOKEN to the token value above.
+Note: These tokens have NOT been saved to the LLM keystore or API key file.
+```
+
+### Authentication Status
 ```
 
 ### Authentication Status

@@ -4,7 +4,7 @@ import json
 import time
 from pathlib import Path
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any, Generator, List
 from pydantic import Field, field_validator
 import click
@@ -1072,7 +1072,7 @@ def register_commands(cli):
                     expires_at = api_key_info.get("expires_at", 0)
                     expiry_date_str = "never"
                     if expires_at > 0:
-                        expiry_date_str = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                        expiry_date_str = datetime.fromtimestamp(expires_at, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
                     click.echo("GitHub Copilot: ✓ Authenticated")
                     click.echo(f"          User: {user_login}")
@@ -1161,8 +1161,8 @@ def register_commands(cli):
                 api_key_info = json.loads(authenticator.api_key_file.read_text())
                 api_key_value_for_verbose = api_key_info.get("token", "")
                 expires_at = api_key_info.get("expires_at", 0)
-                if api_key_value_for_verbose and expires_at > datetime.now().timestamp():
-                    expiry_date = datetime.fromtimestamp(expires_at).strftime("%Y-%m-%d %H:%M:%S")
+                if api_key_value_for_verbose and expires_at > datetime.now(timezone.utc).timestamp():
+                    expiry_date = datetime.fromtimestamp(expires_at, timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                     api_key_status_message += f"Valid, expires {expiry_date}"
                 else:
                     api_key_status_message += "Expired, will refresh on next request"
@@ -1265,7 +1265,7 @@ def register_commands(cli):
             # Show API key information in the same format as status command
             expires_at = api_key_info.get("expires_at", 0)
             if expires_at > 0:
-                expiry_date = datetime.fromtimestamp(expires_at).strftime(
+                expiry_date = datetime.fromtimestamp(expires_at, timezone.utc).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
                 click.echo(f"API key expires: {expiry_date}")

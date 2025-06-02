@@ -84,17 +84,21 @@ You can check your authentication status with:
 
 ```
 $ llm github_copilot auth status
-GitHub Copilot authentication: ✓ Authenticated
+GitHub Copilot: ✓ Authenticated
+       API Key: Valid, expires 2025-07-15 10:30:00
+   AccessToken: Valid, via keystore github_copilot_access_token
 ```
 
 For more detailed information, use the verbose flag:
 
 ```
 $ llm github_copilot auth status --verbose
-GitHub Copilot authentication: ✓ Authenticated
-Access token: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx (from LLM key storage)
-API key expires: 2025-04-14 12:34:56
-API key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GitHub Copilot: ✓ Authenticated
+          User: testuser
+   AccessToken: Valid, via keystore github_copilot_access_token
+   AccessToken: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+       API Key: Valid, expires 2025-07-15 10:30:00
+       API key: abcdef1234567890abcdef1234567890
 ```
 
 ## Usage

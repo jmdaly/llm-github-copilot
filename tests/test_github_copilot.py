@@ -34,8 +34,7 @@ def test_prompt():
 
 
 @pytest.mark.vcr
-@pytest.mark.asyncio
-async def test_async_prompt():
+def test_async_prompt():
     """Test async prompt functionality"""
     # Skip this test for now as async support needs to be implemented
     pytest.skip("Async support not yet implemented")

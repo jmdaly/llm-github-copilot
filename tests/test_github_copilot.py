@@ -34,15 +34,6 @@ def test_prompt():
 
 
 @pytest.mark.vcr
-def test_async_prompt():
-    """Test async prompt functionality"""
-    # Skip this test for now as async support needs to be implemented
-    pytest.skip("Async support not yet implemented")
-
-    # The test will be enabled once async support is added to the model
-
-
-@pytest.mark.vcr
 def test_model_variants():
     """Test that model variants are properly registered"""
     # Test that the default model exists

@@ -8,7 +8,9 @@ from llm_github_copilot import GitHubCopilot, GitHubCopilotAuthenticator
 import httpx
 
 # Mock API key for testing
-GITHUB_COPILOT_TOKEN = os.environ.get("PYTEST_GITHUB_COPILOT_TOKEN", None) or "ghu_mocktoken"
+GITHUB_COPILOT_TOKEN = (
+    os.environ.get("PYTEST_GITHUB_COPILOT_TOKEN", None) or "ghu_mocktoken"
+)
 
 # Mock response data
 MOCK_RESPONSE_TEXT = "1. Captain\n2. Splash"
@@ -20,22 +22,15 @@ def test_prompt():
     model = llm.get_model("github_copilot")
 
     # Mock the authenticator to avoid actual API calls
-    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_TOKEN):
+    with patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
+        return_value=GITHUB_COPILOT_TOKEN,
+    ):
         # Mock the execute method directly
-        with patch.object(model, 'execute', return_value=iter([MOCK_RESPONSE_TEXT])):
+        with patch.object(model, "execute", return_value=iter([MOCK_RESPONSE_TEXT])):
             # Test the prompt
             response = model.prompt("Two names for a pet pelican, be brief")
             assert str(response) == MOCK_RESPONSE_TEXT
-
-
-@pytest.mark.vcr
-@pytest.mark.asyncio
-async def test_async_prompt():
-    """Test async prompt functionality"""
-    # Skip this test for now as async support needs to be implemented
-    pytest.skip("Async support not yet implemented")
-
-    # The test will be enabled once async support is added to the model
 
 
 @pytest.mark.vcr
@@ -47,15 +42,21 @@ def test_model_variants():
     assert default_model.model_id == "github_copilot"
 
     # Test a variant model if it exists
-    with patch("llm_github_copilot.fetch_available_models", return_value={"github_copilot", "github_copilot/claude-3-7-sonnet"}):
+    with patch(
+        "llm_github_copilot.fetch_available_models",
+        return_value={"github_copilot", "github_copilot/o3-mini"},
+    ), patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
+        return_value=True,
+    ):
         # Re-register models to pick up our mocked variants
         for hook in llm.get_plugins():
             if hasattr(hook, "register_models"):
                 hook.register_models(llm.register_model)
 
-        variant_model = llm.get_model("github_copilot/claude-3-7-sonnet")
+        variant_model = llm.get_model("github_copilot/o3-mini")
         assert variant_model is not None
-        assert variant_model.model_id == "github_copilot/claude-3-7-sonnet"
+        assert variant_model.model_id == "github_copilot/o3-mini"
 
 
 @pytest.mark.vcr
@@ -64,11 +65,20 @@ def test_streaming_response():
     model = llm.get_model("github_copilot")
 
     # Mock the authenticator to avoid actual API calls
-    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_TOKEN):
+    with patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
+        return_value=GITHUB_COPILOT_TOKEN,
+    ):
         # Mock the _handle_streaming_request method
-        with patch.object(GitHubCopilot, '_handle_streaming_request', return_value=iter([MOCK_RESPONSE_TEXT])):
+        with patch.object(
+            GitHubCopilot,
+            "_handle_streaming_request",
+            return_value=iter([MOCK_RESPONSE_TEXT]),
+        ):
             # Test streaming response
-            response = model.prompt("Two names for a pet pelican, be brief", stream=True)
+            response = model.prompt(
+                "Two names for a pet pelican, be brief", stream=True
+            )
             assert str(response) == MOCK_RESPONSE_TEXT
 
 
@@ -78,18 +88,19 @@ def test_options():
     model = llm.get_model("github_copilot")
 
     # Extract and test the options directly from the LLM prompt object
-    with patch("llm_github_copilot.GitHubCopilotAuthenticator.get_api_key", return_value=GITHUB_COPILOT_TOKEN):
+    with patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
+        return_value=GITHUB_COPILOT_TOKEN,
+    ):
         # Create a function to return our mock response but also capture the call args
         def mock_response_generator(*args, **kwargs):
             return iter([MOCK_RESPONSE_TEXT])
 
         # We need to patch the model's execute method
-        with patch.object(model, 'execute', return_value=iter([MOCK_RESPONSE_TEXT])):
+        with patch.object(model, "execute", return_value=iter([MOCK_RESPONSE_TEXT])):
             # Test with custom options
             response = model.prompt(
-                "Two names for a pet pelican, be brief",
-                max_tokens=100,
-                temperature=0.7
+                "Two names for a pet pelican, be brief", max_tokens=100, temperature=0.7
             )
 
             # The options are directly available on the response's prompt object
@@ -122,11 +133,13 @@ def test_model_mappings():
     # Create dummy mappings for testing
     test_mappings = {
         "github_copilot": "gpt-4o",
-        "github_copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
+        "github_copilot/o3-mini": "o3-mini",
     }
 
     # Directly patch the class attribute with our test data
-    with patch.object(llm_github_copilot.GitHubCopilot, '_model_mappings', test_mappings):
+    with patch.object(
+        llm_github_copilot.GitHubCopilot, "_model_mappings", test_mappings
+    ):
         model = llm.get_model("github_copilot")
 
         # Get the mappings - should return our test data directly
@@ -135,17 +148,19 @@ def test_model_mappings():
         # Check the mappings match what we set
         assert "github_copilot" in mappings
         assert mappings["github_copilot"] == "gpt-4o"
-        assert "github_copilot/claude-3-7-sonnet" in mappings
+        assert "github_copilot/o3-mini" in mappings
 
 
 @pytest.mark.vcr
 def test_get_streaming_models():
     """Test the get_streaming_models functionality"""
     # Create dummy streaming models list for testing
-    test_streaming_models = ["gpt-4o", "claude-3-7-sonnet"]
+    test_streaming_models = ["gpt-4o", "o3-mini"]
 
     # Directly patch the class attribute with our test data
-    with patch.object(llm_github_copilot.GitHubCopilot, '_streaming_models', test_streaming_models):
+    with patch.object(
+        llm_github_copilot.GitHubCopilot, "_streaming_models", test_streaming_models
+    ):
         model = llm.get_model("github_copilot")
 
         # Get the streaming models - should return our test data directly
@@ -153,7 +168,7 @@ def test_get_streaming_models():
 
         # Check the streaming models match what we set
         assert "gpt-4o" in streaming_models
-        assert "claude-3-7-sonnet" in streaming_models
+        assert "o3-mini" in streaming_models
 
 
 @pytest.mark.vcr
@@ -164,18 +179,18 @@ def test_get_model_for_api():
     # Create dummy mappings for testing
     test_mappings = {
         "github_copilot": "gpt-4o",
-        "github_copilot/claude-3-7-sonnet": "claude-3-7-sonnet"
+        "github_copilot/o3-mini": "o3-mini",
     }
 
     # Patch the get_model_mappings method to return our test data
-    with patch.object(GitHubCopilot, 'get_model_mappings', return_value=test_mappings):
+    with patch.object(GitHubCopilot, "get_model_mappings", return_value=test_mappings):
         # Test with default model
         api_model = model._get_model_for_api("github_copilot")
         assert api_model == "gpt-4o"
 
         # Test with variant model
-        api_model = model._get_model_for_api("github_copilot/claude-3-7-sonnet")
-        assert api_model == "claude-3-7-sonnet"
+        api_model = model._get_model_for_api("github_copilot/o3-mini")
+        assert api_model == "o3-mini"
 
         # Test with unknown model (should return default)
         api_model = model._get_model_for_api("github_copilot/unknown-model")
@@ -228,7 +243,7 @@ def test_non_streaming_request():
     mock_payload = {
         "model": "gpt-4o",
         "messages": [{"role": "user", "content": "Hello"}],
-        "stream": False
+        "stream": False,
     }
 
     # Mock the httpx.post method
@@ -241,20 +256,35 @@ def test_non_streaming_request():
 
     with patch("httpx.post", return_value=mock_response):
         # Test the method
-        result = list(model._non_streaming_request(mock_prompt, mock_headers, mock_payload, "gpt-4o"))
+        result = list(
+            model._non_streaming_request(
+                mock_prompt, mock_headers, mock_payload, "gpt-4o"
+            )
+        )
         assert result[0] == MOCK_RESPONSE_TEXT
 
     # Test with different response format
-    mock_response.json.return_value = {
-        "choices": [{"text": MOCK_RESPONSE_TEXT}]
-    }
+    mock_response.json.return_value = {"choices": [{"text": MOCK_RESPONSE_TEXT}]}
     with patch("httpx.post", return_value=mock_response):
-        result = list(model._non_streaming_request(mock_prompt, mock_headers, mock_payload, "gpt-4o"))
+        result = list(
+            model._non_streaming_request(
+                mock_prompt, mock_headers, mock_payload, "gpt-4o"
+            )
+        )
         assert result[0] == MOCK_RESPONSE_TEXT
 
     # Test with HTTP error
-    with patch("httpx.post", side_effect=httpx.HTTPStatusError("Error", request=MagicMock(), response=mock_response)):
-        result = list(model._non_streaming_request(mock_prompt, mock_headers, mock_payload, "gpt-4o"))
+    with patch(
+        "httpx.post",
+        side_effect=httpx.HTTPStatusError(
+            "Error", request=MagicMock(), response=mock_response
+        ),
+    ):
+        result = list(
+            model._non_streaming_request(
+                mock_prompt, mock_headers, mock_payload, "gpt-4o"
+            )
+        )
         assert "HTTP error" in result[0]
 
 
@@ -265,18 +295,22 @@ def test_authenticator_has_valid_credentials():
 
     # Test with valid API key file
     with patch("pathlib.Path.exists", return_value=True):
-        with patch("pathlib.Path.read_text", return_value=json.dumps({
-            "token": GITHUB_COPILOT_TOKEN,
-            "expires_at": 9999999999
-        })):
+        with patch(
+            "pathlib.Path.read_text",
+            return_value=json.dumps(
+                {"token": GITHUB_COPILOT_TOKEN, "expires_at": 9999999999}
+            ),
+        ):
             assert authenticator.has_valid_credentials() is True
 
     # Test with expired API key file
     with patch("pathlib.Path.exists", return_value=True):
-        with patch("pathlib.Path.read_text", return_value=json.dumps({
-            "token": GITHUB_COPILOT_TOKEN,
-            "expires_at": 1000000000
-        })):
+        with patch(
+            "pathlib.Path.read_text",
+            return_value=json.dumps(
+                {"token": GITHUB_COPILOT_TOKEN, "expires_at": 1000000000}
+            ),
+        ):
             # Also mock llm.get_key to return a valid token
             with patch("llm.get_key", return_value="valid_token"):
                 assert authenticator.has_valid_credentials() is True

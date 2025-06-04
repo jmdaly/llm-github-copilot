@@ -2,11 +2,6 @@ import os
 import pytest
 from unittest.mock import patch
 
-# Configure pytest-asyncio
-def pytest_configure(config):
-    """Configure pytest-asyncio to use function scope for async fixtures."""
-    config.option.asyncio_default_fixture_loop_scope = "function"
-
 # Configure VCR
 @pytest.fixture(scope="module")
 def vcr_config():

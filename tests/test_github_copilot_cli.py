@@ -113,8 +113,8 @@ class TestAuthLogin:
 
         # Mock fetch_available_models
         with patch(
-            "llm_github_copilot.fetch_available_models",
-            return_value={"github-copilot", "github-copilot/gpt-4o"},
+            "llm_github_copilot.fetch_models_data",
+            return_value={"data": [{"id": "o3-mini"}]},
         ):
             # Create a mock CLI command
             @click.command()
@@ -124,7 +124,7 @@ class TestAuthLogin:
                 access_token = mock_authenticator._login()
                 api_key_info = mock_authenticator._refresh_api_key()
                 click.echo("GitHub Copilot login process completed successfully!")
-                models = llm_github_copilot.fetch_available_models(mock_authenticator)
+                models = llm_github_copilot.fetch_models_data(mock_authenticator)
                 click.echo(f"Available models: {', '.join(models)}")
 
             # Run the command
@@ -553,7 +553,7 @@ class TestModelsCommand:
     def mock_registered_models(self):
         """Fixture for mock registered LLM models."""
         model1 = MagicMock(spec=llm.Model)
-        model1.model_id = "github_copilot"
+        model1.model_id = "github_copilot/gpt-4o"
         model2 = MagicMock(spec=llm.Model)
         model2.model_id = "github_copilot/claude-3-7-sonnet"
         other_model = MagicMock(spec=llm.Model)
@@ -581,18 +581,12 @@ class TestModelsCommand:
         self, cli_runner, mock_authenticator, mock_registered_models, mock_models_data
     ):
         """Test 'models --verbose' when authenticated."""
+        print(f"JOEL here1")
         mock_authenticator.has_valid_credentials.return_value = True
         with (
             patch("llm.get_models", return_value=mock_registered_models),
             patch(
-                "llm_github_copilot._fetch_models_data", return_value=mock_models_data
-            ),
-            patch(
-                "llm_github_copilot.GitHubCopilot.get_model_mappings",
-                return_value={
-                    "github_copilot": "gpt-4o",
-                    "github_copilot/claude-3-7-sonnet": "claude-3-7-sonnet",
-                },
+                "llm_github_copilot.fetch_models_data", return_value=mock_models_data
             ),
         ):
             result = cli_runner.invoke(
@@ -617,7 +611,7 @@ class TestModelsCommand:
         with (
             patch("llm.get_models", return_value=mock_registered_models),
             patch(
-                "llm_github_copilot._fetch_models_data", return_value=mock_models_data
+                "llm_github_copilot.fetch_models_data", return_value=mock_models_data
             ),
         ):
             result = cli_runner.invoke(
@@ -674,7 +668,7 @@ class TestModelsCommand:
         with (
             patch("llm.get_models", return_value=mock_registered_models),
             patch(
-                "llm_github_copilot._fetch_models_data",
+                "llm_github_copilot.fetch_models_data",
                 side_effect=Exception("API Error"),
             ),
         ):
@@ -694,7 +688,7 @@ class TestModelsCommand:
         with (
             patch("llm.get_models", return_value=mock_registered_models),
             patch(
-                "llm_github_copilot._fetch_models_data",
+                "llm_github_copilot.fetch_models_data",
                 side_effect=Exception("API Error"),
             ),
         ):

@@ -4,8 +4,10 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 import llm_github_copilot
-from llm_github_copilot import GitHubCopilot, GitHubCopilotAuthenticator
+from llm_github_copilot import GitHubCopilotChat, GitHubCopilotAuthenticator
 import httpx
+
+DEFAULT_MODEL = "github_copilot/gpt-4.1"
 
 # Mock API key for testing
 GITHUB_COPILOT_TOKEN = (
@@ -15,11 +17,10 @@ GITHUB_COPILOT_TOKEN = (
 # Mock response data
 MOCK_RESPONSE_TEXT = "1. Captain\n2. Splash"
 
-
 @pytest.mark.vcr
 def test_prompt():
     """Test basic prompt functionality"""
-    model = llm.get_model("github_copilot")
+    model = llm.get_model(DEFAULT_MODEL)
 
     # Mock the authenticator to avoid actual API calls
     with patch(
@@ -37,14 +38,14 @@ def test_prompt():
 def test_model_variants():
     """Test that model variants are properly registered"""
     # Test that the default model exists
-    default_model = llm.get_model("github_copilot")
+    default_model = llm.get_model(DEFAULT_MODEL)
     assert default_model is not None
-    assert default_model.model_id == "github_copilot"
+    assert default_model.model_id == DEFAULT_MODEL
 
     # Test a variant model if it exists
     with patch(
-        "llm_github_copilot.fetch_available_models",
-        return_value={"github_copilot", "github_copilot/o3-mini"},
+        "llm_github_copilot.fetch_models_data",
+        return_value={"data": [{"id": "o3-mini", "name": "o3-mini", "version": "o3-mini-2025-01-31"}], "object": "list"},
     ), patch(
         "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
         return_value=True,
@@ -60,32 +61,9 @@ def test_model_variants():
 
 
 @pytest.mark.vcr
-def test_streaming_response():
-    """Test streaming response functionality"""
-    model = llm.get_model("github_copilot")
-
-    # Mock the authenticator to avoid actual API calls
-    with patch(
-        "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
-        return_value=GITHUB_COPILOT_TOKEN,
-    ):
-        # Mock the _handle_streaming_request method
-        with patch.object(
-            GitHubCopilot,
-            "_handle_streaming_request",
-            return_value=iter([MOCK_RESPONSE_TEXT]),
-        ):
-            # Test streaming response
-            response = model.prompt(
-                "Two names for a pet pelican, be brief", stream=True
-            )
-            assert str(response) == MOCK_RESPONSE_TEXT
-
-
-@pytest.mark.vcr
 def test_options():
     """Test that options are properly passed to the API"""
-    model = llm.get_model("github_copilot")
+    model = llm.get_model(DEFAULT_MODEL)
 
     # Extract and test the options directly from the LLM prompt object
     with patch(
@@ -125,167 +103,6 @@ def test_authenticator(tmp_path):
 
     # Verify we got the expected token
     assert api_key == GITHUB_COPILOT_TOKEN
-
-
-@pytest.mark.vcr
-def test_model_mappings():
-    """Test the model mappings functionality"""
-    # Create dummy mappings for testing
-    test_mappings = {
-        "github_copilot": "gpt-4o",
-        "github_copilot/o3-mini": "o3-mini",
-    }
-
-    # Directly patch the class attribute with our test data
-    with patch.object(
-        llm_github_copilot.GitHubCopilot, "_model_mappings", test_mappings
-    ):
-        model = llm.get_model("github_copilot")
-
-        # Get the mappings - should return our test data directly
-        mappings = model.get_model_mappings()
-
-        # Check the mappings match what we set
-        assert "github_copilot" in mappings
-        assert mappings["github_copilot"] == "gpt-4o"
-        assert "github_copilot/o3-mini" in mappings
-
-
-@pytest.mark.vcr
-def test_get_streaming_models():
-    """Test the get_streaming_models functionality"""
-    # Create dummy streaming models list for testing
-    test_streaming_models = ["gpt-4o", "o3-mini"]
-
-    # Directly patch the class attribute with our test data
-    with patch.object(
-        llm_github_copilot.GitHubCopilot, "_streaming_models", test_streaming_models
-    ):
-        model = llm.get_model("github_copilot")
-
-        # Get the streaming models - should return our test data directly
-        streaming_models = model.get_streaming_models()
-
-        # Check the streaming models match what we set
-        assert "gpt-4o" in streaming_models
-        assert "o3-mini" in streaming_models
-
-
-@pytest.mark.vcr
-def test_get_model_for_api():
-    """Test the _get_model_for_api method"""
-    model = llm.get_model("github_copilot")
-
-    # Create dummy mappings for testing
-    test_mappings = {
-        "github_copilot": "gpt-4o",
-        "github_copilot/o3-mini": "o3-mini",
-    }
-
-    # Patch the get_model_mappings method to return our test data
-    with patch.object(GitHubCopilot, "get_model_mappings", return_value=test_mappings):
-        # Test with default model
-        api_model = model._get_model_for_api("github_copilot")
-        assert api_model == "gpt-4o"
-
-        # Test with variant model
-        api_model = model._get_model_for_api("github_copilot/o3-mini")
-        assert api_model == "o3-mini"
-
-        # Test with unknown model (should return default)
-        api_model = model._get_model_for_api("github_copilot/unknown-model")
-        assert api_model == "gpt-4o"
-
-
-@pytest.mark.vcr
-def test_build_conversation_messages():
-    """Test the _build_conversation_messages method"""
-    model = llm.get_model("github_copilot")
-
-    # Create a mock prompt
-    mock_prompt = MagicMock()
-    mock_prompt.prompt = "What is the capital of France?"
-
-    # Test with no conversation
-    messages = model._build_conversation_messages(mock_prompt, None)
-    assert len(messages) == 2
-    assert messages[0]["role"] == "system"
-    assert messages[1]["role"] == "user"
-    assert messages[1]["content"] == "What is the capital of France?"
-
-    # Create a mock conversation with one response
-    mock_conversation = MagicMock()
-    mock_response = MagicMock()
-    mock_response.prompt.prompt = "Hello"
-    mock_response.text.return_value = "Hi there!"
-    mock_conversation.responses = [mock_response]
-
-    # Test with conversation
-    messages = model._build_conversation_messages(mock_prompt, mock_conversation)
-    assert len(messages) == 4
-    assert messages[0]["role"] == "system"
-    assert messages[1]["role"] == "user"
-    assert messages[1]["content"] == "Hello"
-    assert messages[2]["role"] == "assistant"
-    assert messages[2]["content"] == "Hi there!"
-    assert messages[3]["role"] == "user"
-    assert messages[3]["content"] == "What is the capital of France?"
-
-
-@pytest.mark.vcr
-def test_non_streaming_request():
-    """Test the _non_streaming_request method"""
-    model = llm.get_model("github_copilot")
-
-    # Create mock objects
-    mock_prompt = MagicMock()
-    mock_headers = {"Authorization": f"Bearer {GITHUB_COPILOT_TOKEN}"}
-    mock_payload = {
-        "model": "gpt-4o",
-        "messages": [{"role": "user", "content": "Hello"}],
-        "stream": False,
-    }
-
-    # Mock the httpx.post method
-    mock_response = MagicMock()
-    mock_response.text = MOCK_RESPONSE_TEXT
-    mock_response.json.return_value = {
-        "choices": [{"message": {"content": MOCK_RESPONSE_TEXT}}]
-    }
-    mock_response.raise_for_status = MagicMock()
-
-    with patch("httpx.post", return_value=mock_response):
-        # Test the method
-        result = list(
-            model._non_streaming_request(
-                mock_prompt, mock_headers, mock_payload, "gpt-4o"
-            )
-        )
-        assert result[0] == MOCK_RESPONSE_TEXT
-
-    # Test with different response format
-    mock_response.json.return_value = {"choices": [{"text": MOCK_RESPONSE_TEXT}]}
-    with patch("httpx.post", return_value=mock_response):
-        result = list(
-            model._non_streaming_request(
-                mock_prompt, mock_headers, mock_payload, "gpt-4o"
-            )
-        )
-        assert result[0] == MOCK_RESPONSE_TEXT
-
-    # Test with HTTP error
-    with patch(
-        "httpx.post",
-        side_effect=httpx.HTTPStatusError(
-            "Error", request=MagicMock(), response=mock_response
-        ),
-    ):
-        result = list(
-            model._non_streaming_request(
-                mock_prompt, mock_headers, mock_payload, "gpt-4o"
-            )
-        )
-        assert "HTTP error" in result[0]
 
 
 @pytest.mark.vcr

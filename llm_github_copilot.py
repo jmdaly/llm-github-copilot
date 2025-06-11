@@ -1,14 +1,13 @@
 import llm
+import llm.default_plugins.openai_models
 import os
 import json
 import time
 from pathlib import Path
 import httpx
 from datetime import datetime, timezone
-from typing import Optional, Any, Generator, List
-from pydantic import Field, field_validator
+from typing import Optional, Any
 import click
-import secrets
 
 
 def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
@@ -57,14 +56,20 @@ def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
         print(f"Error fetching models data: {str(e)}")
         raise
 
+_models_data_cache = None
+def fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
+    """
+    Cached/memoized wrapper around _fetch_models_data
+    """
+    global _models_data_cache
+    if _models_data_cache is None:
+        _models_data_cache = _fetch_models_data(authenticator)  # Use helper
+    return _models_data_cache
+
 
 @llm.hookimpl
 def register_models(register):
     """Register all GitHub Copilot models with the LLM CLI tool."""
-    # Register the default model first
-    default_model = GitHubCopilot()
-    register(default_model)
-
     # Try to fetch available models without forcing authentication
     try:
         # Create an authenticator to fetch models
@@ -72,55 +77,18 @@ def register_models(register):
 
         # Only fetch models if we already have valid credentials
         if authenticator.has_valid_credentials():
-            models = fetch_available_models(authenticator)
+            models_data = fetch_models_data(authenticator)
 
             # Register all model variants
-            for model_id in models:
-                if model_id == default_model.model_id:
-                    continue  # Skip the default model as it's already registered
+            for model_data in models_data.get("data", []):
+                model_id = f"github_copilot/{model_data.get('id')}"
 
-                model = GitHubCopilot()
-                model.model_id = model_id
-                register(model)
+                register(
+                    GitHubCopilotChat(model_id, model_data),
+                    GitHubCopilotAsyncChat(model_id, model_data),
+                )
     except Exception as e:
         print(f"Warning: Failed to fetch GitHub Copilot models: {str(e)}")
-        print("Falling back to default model only")
-
-
-def fetch_available_models(authenticator: "GitHubCopilotAuthenticator") -> set[str]:
-    """
-    Fetches available model IDs from the GitHub Copilot API.
-
-    This function retrieves the list of available models from the GitHub Copilot API
-    and formats them as LLM-compatible model IDs (e.g., "github_copilot/claude-3-7-sonnet").
-
-    Args:
-        authenticator: The GitHubCopilotAuthenticator instance to use for authentication
-
-    Returns:
-        set[str]: A set of available model IDs, always including at least "github_copilot"
-
-    Note:
-        If the API request fails, this function will return a minimal set containing
-        only the default "github_copilot" model ID.
-    """
-    model_ids = {"github_copilot"}  # Always include default model
-    try:
-        models_data = _fetch_models_data(authenticator)
-
-        # Process models from response - models are in the "data" field
-        for model in models_data.get("data", []):
-            model_id = model.get("id")
-            # Skip the model ID that the base 'github_copilot' maps to by default
-            if model_id and model_id != GitHubCopilot.DEFAULT_MODEL_MAPPING:
-                model_ids.add(f"github_copilot/{model_id}")
-
-        return model_ids
-
-    except Exception as e:
-        # Error is logged within _fetch_models_data
-        # Return a minimal set of known models as fallback
-        return {"github_copilot"}
 
 
 class GitHubCopilotAuthenticator:
@@ -499,506 +467,52 @@ class GitHubCopilotAuthenticator:
             return None
 
 
-class GitHubCopilot(llm.Model):
+class _GitHubCopilot(llm.default_plugins.openai_models.Chat):
     """
     GitHub Copilot model implementation for LLM.
     """
-
-    model_id = "github_copilot"
-    can_stream = True
-
-    # API base URL
     API_BASE = "https://api.githubcopilot.com"
 
-    # Default system message
-    DEFAULT_SYSTEM_MESSAGE = "You are GitHub Copilot, an AI programming assistant."
-
-    # Default request timeout in seconds
-    DEFAULT_TIMEOUT = 120
-    NON_STREAMING_TIMEOUT = 180
-
-    # Default model mapping
-    DEFAULT_MODEL_MAPPING = "gpt-4o"
-
-    # Cache for model mappings
-    _model_mappings = None
-
-    # Cache for streaming models
-    _streaming_models = None
-
-    class Options(llm.Options):
-        """
-        Options for the GitHub Copilot model.
-        """
-
-        max_tokens: Optional[int] = Field(
-            description="Maximum number of tokens to generate", default=None
-        )
-
-        temperature: Optional[float] = Field(
-            description="Controls randomness in the output (0-1)",
-            default=None,
-        )
-
-        @field_validator("max_tokens")
-        def validate_max_tokens(cls, max_tokens):
-            if max_tokens is None:
-                return None
-            if max_tokens < 1:
-                raise ValueError("max_tokens must be >= 1")
-            return max_tokens
-
-        @field_validator("temperature")
-        def validate_temperature(cls, temperature):
-            if temperature is None:
-                return None
-            if not 0 <= temperature <= 1:
-                raise ValueError("temperature must be between 0 and 1")
-            return temperature
-
-    def __init__(self) -> None:
-        """Initialize the GitHub Copilot model."""
-        self.authenticator = GitHubCopilotAuthenticator()
-
-    @classmethod
-    def get_model_mappings(cls) -> dict[str, str]:
-        """
-        Get model mappings, fetching them if not already cached.
-
-        This method retrieves the mapping between LLM model IDs (e.g., "github_copilot/gpt-4o")
-        and the corresponding API model names (e.g., "gpt-4o"). It caches the results
-        to avoid unnecessary API calls.
-
-        Returns:
-            Dict mapping model IDs to API model names
-
-        Note:
-            If fetching the mappings fails, a default mapping will be returned
-            that includes only the default model.
-        """
-        if cls._model_mappings is None:
-            try:
-                # Create a temporary authenticator to fetch models
-                authenticator = GitHubCopilotAuthenticator()
-                models_data = _fetch_models_data(authenticator)  # Use helper
-
-                mappings = {"github_copilot": cls.DEFAULT_MODEL_MAPPING}
-
-                # Process models from response - models are in the "data" field
-                for model in models_data.get("data", []):
-                    model_id = model.get("id")
-                    if model_id:
-                        # Add all models, including the default one
-                        mappings[f"github_copilot/{model_id}"] = model_id
-
-                cls._model_mappings = mappings
-
-            except Exception as e:
-                # Error logged by _fetch_models_data
-                # Fallback to basic mappings
-                cls._model_mappings = {
-                    "github_copilot": cls.DEFAULT_MODEL_MAPPING,
-                }
-
-        return cls._model_mappings
-
-    @classmethod
-    def get_streaming_models(cls) -> list[str]:
-        """
-        Get the list of models that support streaming responses.
-
-        This method retrieves information about which models support streaming responses
-        from the GitHub Copilot API. It caches the results to avoid unnecessary API calls.
-
-        Returns:
-            list[str]: A list of API model names that support streaming
-
-        Note:
-            If fetching the streaming models fails, it will assume all models
-            support streaming as a fallback.
-        """
-        if cls._streaming_models is None:
-            try:
-                # Create a temporary authenticator to fetch models
-                authenticator = GitHubCopilotAuthenticator()
-                models_data = _fetch_models_data(authenticator)  # Use helper
-
-                streaming_models = []
-
-                # Process models from response - models are in the "data" field
-                for model in models_data.get("data", []):
-                    model_id = model.get("id")
-                    # Check if model supports streaming
-                    capabilities = model.get("capabilities", {})
-                    supports = capabilities.get("supports", {})
-
-                    if supports.get("streaming", False) and model_id:
-                        streaming_models.append(model_id)
-
-                # Always include default model mapping value
-                if cls.DEFAULT_MODEL_MAPPING not in streaming_models:
-                    streaming_models.append(cls.DEFAULT_MODEL_MAPPING)
-
-                cls._streaming_models = streaming_models
-
-            except Exception as e:
-                # Error logged by _fetch_models_data
-                print(f"Failed to process streaming models data: {str(e)}")
-                # Fallback to assuming all models support streaming
-                mappings = cls.get_model_mappings()
-                cls._streaming_models = list(mappings.values())
-
-        return cls._streaming_models
-
-    def _get_model_for_api(self, model: str) -> str:
-        """
-        Convert model name to API-compatible format.
-
-        Args:
-            model: The model identifier (e.g., "github_copilot/o1")
-
-        Returns:
-            The API model name (e.g., "o1")
-        """
-        # Get model mappings
-        mappings = self.get_model_mappings()
-
-        # Strip provider prefix if present
-        if "/" in model:
-            _, model_name = model.split("/", 1)
-            if model_name in mappings.values():
-                return model_name
-
-        # Use the mapping or default to gpt-4o
-        return mappings.get(model, self.DEFAULT_MODEL_MAPPING)
-
-    def _non_streaming_request(
-        self,
-        prompt: llm.Prompt,
-        headers: dict[str, str],
-        payload: dict[str, Any],
-        model_name: str,
-    ) -> Generator[str, None, None]:
-        """
-        Handle a non-streaming request to the GitHub Copilot API.
-
-        This method sends a non-streaming request to the GitHub Copilot API
-        and processes the response. It handles various response formats and
-        error conditions.
-
-        Args:
-            prompt: The LLM prompt object
-            headers: HTTP headers for the request
-            payload: The request payload (will have stream=False set)
-            model_name: The API model name to use
-
-        Yields:
-            str: The generated text from the API response
-
-        Note:
-            In case of errors, this method yields an error message instead of raising
-            an exception to maintain compatibility with the streaming interface.
-        """
-        try:
-            # Ensure stream is set to false
-            payload["stream"] = False
-
-            api_response = httpx.post(
-                f"{self.API_BASE}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=self.NON_STREAMING_TIMEOUT,
-            )
-            api_response.raise_for_status()
-
-            # Try to parse JSON
-            try:
-                json_data = api_response.json()
-
-                if "choices" in json_data and json_data["choices"]:
-                    choice = json_data["choices"][0]
-
-                    # Handle different response formats
-                    if "message" in choice and choice["message"]:
-                        content = choice["message"].get("content", "")
-                        if content:
-                            yield content
-                            return
-                    elif "text" in choice:
-                        content = choice.get("text", "")
-                        if content:
-                            yield content
-                            return
-                    elif "content" in choice:
-                        content = choice.get("content", "")
-                        if content:
-                            yield content
-                            return
-
-                # If we couldn't extract content through known paths, try to find it elsewhere
-                if "content" in json_data:
-                    yield json_data["content"]
-                    return
-
-            except json.JSONDecodeError as e:
-                print(f"JSON decode error: {str(e)}")
-
-            # If JSON parsing fails or no content found, return raw text
-            yield api_response.text
-
-        except httpx.HTTPStatusError as e:
-            # Ensure the response body is read before accessing .text
-            e.response.read()
-            error_body_text = e.response.text
-            error_text = f"HTTP error {e.response.status_code}: {error_body_text}"
-            print(error_text)
-
-            yield error_text
-        except httpx.RequestError as e:
-            error_text = f"Request error: {str(e)}"
-            print(error_text)
-            yield error_text
-        except Exception as e:
-            error_text = f"Error with request: {str(e)}"
-            print(error_text)
-            yield error_text
-
-    def execute(
-        self,
-        prompt: llm.Prompt,
-        stream: bool,
-        response: llm.Response,
-        conversation: Optional[llm.Conversation],
-    ) -> Generator[str, None, None]:
-        """
-        Execute a prompt against the GitHub Copilot API.
-
-        This is the main method that processes a prompt and returns a response.
-        It handles authentication, builds the request payload, determines whether
-        to use streaming or non-streaming mode, and processes the response.
-
-        Args:
-            prompt: The LLM prompt object containing the user's input
-            stream: Whether to stream the response (if supported by the model)
-            response: The LLM response object to populate
-            conversation: Optional conversation history to include in the request
-
-        Yields:
-            str: Chunks of the generated text from the API response
-
-        Note:
-            If authentication fails, this method yields an error message instead
-            of raising an exception.
-        """
+    def __init__(self, model_id, model_data, *args, **kwargs):
         # Get API key
+        self.authenticator = GitHubCopilotAuthenticator()
         try:
             api_key = self.authenticator.get_api_key()
         except Exception as e:
             error_message = str(e)
             if "authentication required" in error_message.lower():
-                yield "GitHub Copilot authentication required. Run 'llm github_copilot auth login' to authenticate."
+                print("GitHub Copilot authentication required. Run 'llm github_copilot auth login' to authenticate.")
             else:
-                yield f"Error getting GitHub Copilot API key: {error_message}"
-            return
-
-        # Get model name
-        model_name = self._get_model_for_api(self.model_id)
-        # Prepare the request with required headers
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "editor-version": "vscode/1.85.1",
-            "Copilot-Integration-Id": "vscode-chat",  # Use a recognized integration ID
-        }
-
-        # Build conversation messages
-        messages = self._build_conversation_messages(prompt, conversation)
-
-        # Get options
-        max_tokens = prompt.options.max_tokens or 8192
-        temperature = prompt.options.temperature or 0.1
-
-        # Prepare payload
-        payload = {
-            "model": model_name,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "stream": model_name in self.get_streaming_models(),
-        }
-
-        # Check if model supports streaming
-        supports_streaming = model_name in self.get_streaming_models()
-
-        # Check if model supports streaming
-        if supports_streaming and stream:
-            payload["stream"] = True
-            yield from self._handle_streaming_request(
-                prompt, headers, payload, model_name
-            )
+                print(f"Error getting GitHub Copilot API key: {error_message}")
+            raise
+        headers = self.authenticator._get_github_headers()
+        if "/" in model_id:
+            _, model_name = model_id.split("/", 1)
         else:
-            # Use non-streaming request for unsupported models or when streaming is disabled
-            payload["stream"] = False
-            yield from self._non_streaming_request(prompt, headers, payload, model_name)
+            model_name = model_id
 
-    def _build_conversation_messages(
-        self, prompt: llm.Prompt, conversation: Optional[llm.Conversation]
-    ) -> list[dict[str, str]]:
-        """
-        Build the messages array for the API request from the conversation history.
+        supports = model_data.get("capabilities", {}).get("supports", {})
 
-        This method constructs the messages array required by the GitHub Copilot API
-        by extracting previous messages from the conversation history and adding
-        the current prompt. It also ensures a system message is included.
+        super().__init__(
+                model_id,
+                *args,
+                key=api_key,
+                model_name=model_name,
+                api_base=self.API_BASE,
+                headers=headers,
+                can_stream=supports.get("streaming", False),
+                supports_tools=supports.get("tool_calls", False),
+                supports_schema=supports.get("structured_outputs", False),
+                **kwargs)
 
-        Args:
-            prompt: The current LLM prompt object
-            conversation: Optional conversation history
+    def __str__(self):
+        return "GitHub Copilot Chat: {}".format(self.model_id)
 
-        Returns:
-            list[dict[str, str]]: A list of message objects in the format required
-                                 by the GitHub Copilot API, each with 'role' and 'content'
-        """
-        messages = []
+class GitHubCopilotChat(_GitHubCopilot, llm.default_plugins.openai_models.Chat):
+    pass
 
-        # Extract messages from conversation history
-        if conversation and conversation.responses:
-            for prev_response in conversation.responses:
-                # Add user message
-                messages.append(
-                    {"role": "user", "content": prev_response.prompt.prompt}
-                )
-                # Add assistant message
-                messages.append({"role": "assistant", "content": prev_response.text()})
-
-        # Add the current prompt and system message if needed
-        if messages:
-            # Add system message if not present
-            if not any(msg.get("role") == "system" for msg in messages):
-                messages.insert(
-                    0,
-                    {
-                        "role": "system",
-                        "content": self.DEFAULT_SYSTEM_MESSAGE,
-                    },
-                )
-            # Add the current prompt
-            messages.append({"role": "user", "content": prompt.prompt})
-        else:
-            # First message in conversation
-            messages = [
-                {
-                    "role": "system",
-                    "content": self.DEFAULT_SYSTEM_MESSAGE,
-                },
-                {"role": "user", "content": prompt.prompt},
-            ]
-
-        return messages
-
-    def _handle_streaming_request(
-        self,
-        prompt: llm.Prompt,
-        headers: dict[str, str],
-        payload: dict[str, Any],
-        model_name: str,
-    ) -> Generator[str, None, None]:
-        """
-        Handle a streaming request to the GitHub Copilot API.
-
-        This method sends a streaming request to the GitHub Copilot API and
-        processes the server-sent events (SSE) response. It parses each event
-        and extracts the generated text chunks.
-
-        Args:
-            prompt: The LLM prompt object
-            headers: HTTP headers for the request
-            payload: The request payload (will have stream=True set)
-            model_name: The API model name to use
-
-        Yields:
-            str: Chunks of the generated text from the streaming API response
-
-        Note:
-            If streaming fails, this method falls back to a non-streaming request
-            to ensure the user still gets a response.
-        """
-        try:
-            with httpx.Client() as client:
-                with client.stream(
-                    "POST",
-                    f"{self.API_BASE}/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=self.DEFAULT_TIMEOUT,
-                ) as response:
-                    response.raise_for_status()
-
-                    for line in response.iter_lines():
-                        if not line:
-                            continue
-
-                        # Handle both bytes and string types
-                        if isinstance(line, bytes):
-                            line = line.decode("utf-8", errors="replace")
-
-                        line = line.strip()
-                        if line.startswith("data:"):
-                            data = line[5:].strip()
-                            if data == "[DONE]":
-                                continue
-
-                            try:
-                                json_data = json.loads(data)
-                                if "choices" in json_data and json_data["choices"]:
-                                    choice = json_data["choices"][0]
-
-                                    # Handle different response formats
-                                    if "delta" in choice:
-                                        content = choice["delta"].get("content", "")
-                                        if content:
-                                            yield content
-                                    elif "text" in choice:
-                                        content = choice.get("text", "")
-                                        if content:
-                                            yield content
-                                    elif "message" in choice:
-                                        content = choice["message"].get("content", "")
-                                        if content:
-                                            yield content
-                            except json.JSONDecodeError:
-                                # If not valid JSON, check if it's plain text content
-                                if (
-                                    data
-                                    and not data.startswith("{")
-                                    and not data.startswith("[")
-                                ):
-                                    yield data
-
-        except httpx.HTTPStatusError as e:
-            # Read the response body before trying to access .text
-            # This is crucial for streaming responses that error out
-            e.response.read()
-            error_body_text = e.response.text
-            error_msg = f"HTTP error {e.response.status_code}: {error_body_text}"
-            print(error_msg)
-            # Print more detailed error information
-            print(f"Request headers: {headers}")
-            print(f"Request payload: {json.dumps(payload)}")
-            # Fall back to non-streaming on error
-            payload["stream"] = False
-            yield from self._non_streaming_request(prompt, headers, payload, model_name)
-        except httpx.RequestError as e:
-            print(f"Request error: {str(e)}")
-            # Fall back to non-streaming on error
-            payload["stream"] = False
-            yield from self._non_streaming_request(prompt, headers, payload, model_name)
-        except Exception as e:
-            print(f"Error with streaming request: {str(e)}")
-            # Fall back to non-streaming on error
-            payload["stream"] = False
-            yield from self._non_streaming_request(prompt, headers, payload, model_name)
+class GitHubCopilotAsyncChat(_GitHubCopilot, llm.default_plugins.openai_models.AsyncChat):
+    pass
 
 
 # LLM CLI command implementation
@@ -1144,8 +658,9 @@ def register_commands(cli):
 
                     # Fetch available models
                     click.echo("Fetching available models...")
-                    models = fetch_available_models(authenticator)
-                    click.echo(f"Available models: {', '.join(models)}")
+                    models_data = fetch_models_data(authenticator)
+                    model_ids = [m.get("id") for m in models_data.get("data")]
+                    click.echo(f"Available models: {', '.join(model_ids)}")
 
         except Exception as e:
             click.echo(f"Error during authentication: {str(e)}", err=True)
@@ -1403,7 +918,7 @@ def register_commands(cli):
             if not raw:
                 click.echo("Fetching detailed model information...")
             try:
-                models_data = _fetch_models_data(authenticator)
+                models_data = fetch_models_data(authenticator)
                 api_models_info = {
                     model["id"]: model for model in models_data.get("data", [])
                 }
@@ -1430,44 +945,30 @@ def register_commands(cli):
             # Verbose output (-v)
             elif verbose:
                 click.echo("Registered GitHub Copilot models (Verbose):")
-                model_mappings = GitHubCopilot.get_model_mappings()
 
                 for i, model_id in enumerate(github_model_ids):
-                    api_model_name = model_mappings.get(model_id)
+                    _, api_model_name = model_id.split("/", 1)
                     vendor = "N/A"
                     name = "N/A"
                     version = "N/A"
                     context_length = "N/A"
                     family = "N/A"  # Initialize family
 
-                    if api_model_name and api_model_name in api_models_info:
-                        model_info = api_models_info[api_model_name]
-                        vendor = model_info.get("vendor", "N/A")
-                        name = model_info.get("name", "N/A")
-                        version = model_info.get("version", "N/A")
-                        # Get capabilities and limits
-                        capabilities = model_info.get("capabilities", {})
-                        limits = capabilities.get("limits", {})
-                        # Extract details
-                        context_length = limits.get("max_context_window_tokens", "N/A")
-                        family = capabilities.get("family", "N/A")  # Get family
-                    elif model_id == "github_copilot":  # Handle default alias
-                        default_api_name = GitHubCopilot.DEFAULT_MODEL_MAPPING
-                        if default_api_name in api_models_info:
-                            model_info = api_models_info[default_api_name]
-                            vendor = model_info.get("vendor", "N/A")
-                            name = model_info.get("name", "N/A")
-                            version = model_info.get("version", "N/A")
-                            # Get capabilities and limits for default
-                            capabilities = model_info.get("capabilities", {})
-                            limits = capabilities.get("limits", {})
-                            # Extract details for default
-                            context_length = limits.get(
-                                "max_context_window_tokens", "N/A"
-                            )
-                            family = capabilities.get(
-                                "family", "N/A"
-                            )  # Get family for default
+                    model_info = api_models_info[api_model_name]
+                    vendor = model_info.get("vendor", "N/A")
+                    name = model_info.get("name", "N/A")
+                    version = model_info.get("version", "N/A")
+                    # Get capabilities, limits, and supports
+                    capabilities = model_info.get("capabilities", {})
+                    limits = capabilities.get("limits", {})
+                    supports = capabilities.get("supports", {})
+                    # Extract details
+                    context_length = limits.get("max_context_window_tokens", "N/A")
+                    family = capabilities.get("family", "N/A")  # Get family
+                    can_stream=supports.get("streaming", False)
+                    supports_tools=supports.get("tool_calls", False)
+                    supports_schema=supports.get("structured_outputs", False)
+
 
                     # Print model details
                     formatted_context_length = (
@@ -1481,6 +982,9 @@ def register_commands(cli):
                     click.echo(f"  version: {version}")
                     click.echo(f"  family: {family}")
                     click.echo(f"  context_length: {formatted_context_length}")
+                    click.echo(f"  streaming: {can_stream}")
+                    click.echo(f"  tool calls: {supports_tools}")
+                    click.echo(f"  schema (structured outputs): {supports_schema}")
                     # Format context_length with commas if it's a number
 
                     # Add a blank line separator between models, but not after the last one

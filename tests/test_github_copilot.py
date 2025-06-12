@@ -17,16 +17,33 @@ GITHUB_COPILOT_TOKEN = (
 # Mock response data
 MOCK_RESPONSE_TEXT = "1. Captain\n2. Splash"
 
+MOCK_MODEL_DATA = {
+    "data": [
+        {
+            "id": "gpt-4.1",
+            "name": "GPT-4.1",
+            "version": "gpt-4.1-2025-04-14"
+        },
+        {
+            "id": "o3-mini",
+            "name": "o3-mini",
+            "version": "o3-mini-2025-01-31"
+        }
+    ]
+}
+
 @pytest.mark.vcr
 def test_prompt():
     """Test basic prompt functionality"""
-    model = llm.get_model(DEFAULT_MODEL)
-
     # Mock the authenticator to avoid actual API calls
     with patch(
+        "llm_github_copilot.fetch_models_data",
+        return_value=MOCK_MODEL_DATA,
+    ), patch(
         "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
         return_value=GITHUB_COPILOT_TOKEN,
     ):
+        model = llm.get_model(DEFAULT_MODEL)
         # Mock the execute method directly
         with patch.object(model, "execute", return_value=iter([MOCK_RESPONSE_TEXT])):
             # Test the prompt
@@ -37,19 +54,19 @@ def test_prompt():
 @pytest.mark.vcr
 def test_model_variants():
     """Test that model variants are properly registered"""
-    # Test that the default model exists
-    default_model = llm.get_model(DEFAULT_MODEL)
-    assert default_model is not None
-    assert default_model.model_id == DEFAULT_MODEL
-
     # Test a variant model if it exists
     with patch(
         "llm_github_copilot.fetch_models_data",
-        return_value={"data": [{"id": "o3-mini", "name": "o3-mini", "version": "o3-mini-2025-01-31"}], "object": "list"},
+        return_value=MOCK_MODEL_DATA,
     ), patch(
         "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
         return_value=True,
     ):
+        # Test that the default model exists
+        default_model = llm.get_model(DEFAULT_MODEL)
+        assert default_model is not None
+        assert default_model.model_id == DEFAULT_MODEL
+
         # Re-register models to pick up our mocked variants
         for hook in llm.get_plugins():
             if hasattr(hook, "register_models"):
@@ -63,13 +80,15 @@ def test_model_variants():
 @pytest.mark.vcr
 def test_options():
     """Test that options are properly passed to the API"""
-    model = llm.get_model(DEFAULT_MODEL)
-
     # Extract and test the options directly from the LLM prompt object
     with patch(
+        "llm_github_copilot.fetch_models_data",
+        return_value=MOCK_MODEL_DATA,
+    ), patch(
         "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
         return_value=GITHUB_COPILOT_TOKEN,
     ):
+        model = llm.get_model(DEFAULT_MODEL)
         # Create a function to return our mock response but also capture the call args
         def mock_response_generator(*args, **kwargs):
             return iter([MOCK_RESPONSE_TEXT])

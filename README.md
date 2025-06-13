@@ -169,3 +169,11 @@ If you want to record new VCR cassettes for tests, set your API key:
 export PYTEST_GITHUB_COPILOT_TOKEN=your_token_here
 pytest --vcr-record=new_episodes
 ```
+
+You can also run the tests in a containerized environment to avoid
+contamination from the environment (e.g. auth keys/files):
+
+```
+docker build -t llm-github-copilot-test .
+docker run -it llm-github-copilot-test
+```

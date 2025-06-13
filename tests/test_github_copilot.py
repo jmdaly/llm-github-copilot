@@ -40,6 +40,9 @@ def test_prompt():
         "llm_github_copilot.fetch_models_data",
         return_value=MOCK_MODEL_DATA,
     ), patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
+        return_value=True,
+    ), patch(
         "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
         return_value=GITHUB_COPILOT_TOKEN,
     ):
@@ -61,6 +64,9 @@ def test_model_variants():
     ), patch(
         "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
         return_value=True,
+    ), patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
+        return_value=GITHUB_COPILOT_TOKEN,
     ):
         # Test that the default model exists
         default_model = llm.get_model(DEFAULT_MODEL)
@@ -84,6 +90,9 @@ def test_options():
     with patch(
         "llm_github_copilot.fetch_models_data",
         return_value=MOCK_MODEL_DATA,
+    ), patch(
+        "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
+        return_value=True,
     ), patch(
         "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
         return_value=GITHUB_COPILOT_TOKEN,

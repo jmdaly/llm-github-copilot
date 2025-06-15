@@ -23,8 +23,7 @@ Free [plan](https://github.com/features/copilot#pricing) includes up to 2,000 co
 
 ### Auth Command Help
 
-```
-
+```bash
 $ llm github_copilot auth --help
 Usage: llm github_copilot auth [OPTIONS] COMMAND [ARGS]...
 
@@ -54,6 +53,7 @@ When you run the login command, the plugin will:
 Example login output:
 
 ```
+$ llm github_copilot auth login --help
 Usage: llm github_copilot auth login [OPTIONS]
 
   Authenticate with GitHub Copilot to generate a new access token.
@@ -80,11 +80,10 @@ llm github_copilot auth login --force
 ```
 
 You can also perform the login process and display the obtained access token and API key without saving them to the LLM keystore or the API key file. This is useful if you want to manually manage these tokens or use them in environment variables:
+
 ```bash
-llm github_copilot auth login --show-only
-```
-This will output something like:
-```
+$ llm github_copilot auth login --show-only
+
 GitHub Copilot: ✓ Authenticated
           User: your_github_username
    AccessToken: Valid
@@ -97,13 +96,10 @@ Note: These tokens have NOT been saved to the LLM keystore or API key file.
 ```
 
 ### Authentication Status
-```
-
-### Authentication Status
 
 You can check your authentication status with:
 
-```
+```bash
 $ llm github_copilot auth status
 GitHub Copilot: ✓ Authenticated
        API Key: Valid, expires 2025-07-15 10:30:00
@@ -112,7 +108,7 @@ GitHub Copilot: ✓ Authenticated
 
 For more detailed information, use the verbose flag:
 
-```
+```bash
 $ llm github_copilot auth status --verbose
 GitHub Copilot: ✓ Authenticated
           User: testuser
@@ -120,6 +116,7 @@ GitHub Copilot: ✓ Authenticated
    AccessToken: ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
        API Key: Valid, expires 2025-07-15 10:30:00
        API key: abcdef1234567890abcdef1234567890
+
 ```
 
 ## Usage

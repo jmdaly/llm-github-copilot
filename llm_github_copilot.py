@@ -41,8 +41,12 @@ def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
         response.raise_for_status()
         return response.json()
     except httpx.HTTPStatusError as e:
+        # Ensure the response body is read before accessing .text,
+        # in case of chunked error responses.
+        e.response.read()
+        error_body_text = e.response.text
         print(
-            f"Error fetching models data (HTTP {e.response.status_code}): {e.response.text}"
+            f"Error fetching models data (HTTP {e.response.status_code}): {error_body_text}"
         )
         raise
     except httpx.RequestError as e:
@@ -743,7 +747,10 @@ class GitHubCopilot(llm.Model):
             yield api_response.text
 
         except httpx.HTTPStatusError as e:
-            error_text = f"HTTP error {e.response.status_code}: {e.response.text}"
+            # Ensure the response body is read before accessing .text
+            e.response.read()
+            error_body_text = e.response.text
+            error_text = f"HTTP error {e.response.status_code}: {error_body_text}"
             print(error_text)
 
             yield error_text
@@ -970,7 +977,11 @@ class GitHubCopilot(llm.Model):
                                     yield data
 
         except httpx.HTTPStatusError as e:
-            error_msg = f"HTTP error {e.response.status_code}: {e.response.text}"
+            # Read the response body before trying to access .text
+            # This is crucial for streaming responses that error out
+            e.response.read()
+            error_body_text = e.response.text
+            error_msg = f"HTTP error {e.response.status_code}: {error_body_text}"
             print(error_msg)
             # Print more detailed error information
             print(f"Request headers: {headers}")

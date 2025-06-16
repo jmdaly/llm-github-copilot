@@ -467,7 +467,7 @@ class GitHubCopilotAuthenticator:
             return None
 
 
-class _GitHubCopilot(llm.default_plugins.openai_models.Chat):
+class _GitHubCopilot():
     """
     GitHub Copilot model implementation for LLM.
     """

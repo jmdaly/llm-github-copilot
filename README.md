@@ -125,10 +125,10 @@ Once installed, you can use GitHub Copilot models with the `llm` command:
 
 ```bash
 # Chat with GitHub Copilot
-llm -m github_copilot "Write a Python function that calculates the Fibonacci sequence."
+llm -m github_copilot/model-name "Write a Python function that calculates the Fibonacci sequence."
 
 # Specify options like length
-llm -m github_copilot "Tell me a joke" -o max_tokens 100
+llm -m github_copilot/model-name "Tell me a joke" -o max_tokens 100
 ```
 
 ## Options

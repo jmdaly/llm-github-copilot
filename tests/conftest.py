@@ -27,13 +27,5 @@ def vcr_cassette_dir(request):
 def unset_copilot_env_vars():
     """Fixture to automatically unset GitHub Copilot environment variables for tests."""
     env_vars_to_clear = ["GH_COPILOT_TOKEN", "GITHUB_COPILOT_TOKEN"]
-    with patch.dict(os.environ, {var: "" for var in env_vars_to_clear}, clear=True):
-        yield
-
-
-@pytest.fixture(autouse=True)
-def unset_copilot_env_vars():
-    """Fixture to automatically unset GitHub Copilot environment variables for tests."""
-    env_vars_to_clear = ["GH_COPILOT_TOKEN", "GITHUB_COPILOT_TOKEN"]
-    with patch.dict(os.environ, {var: "" for var in env_vars_to_clear}, clear=True):
+    with patch.dict(os.environ, {var: "" for var in env_vars_to_clear}, clear=False):
         yield

@@ -2,10 +2,16 @@ import json
 import llm
 import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import llm_github_copilot
-from llm_github_copilot import GitHubCopilotChat, GitHubCopilotAuthenticator
-import httpx
+from llm_github_copilot import (
+    GitHubCopilotAsyncChat,
+    GitHubCopilotAsyncResponses,
+    GitHubCopilotAuthenticator,
+    GitHubCopilotChat,
+    GitHubCopilotResponses,
+    _uses_responses_api,
+)
 
 DEFAULT_MODEL = "github_copilot/gpt-4.1"
 
@@ -31,6 +37,95 @@ MOCK_MODEL_DATA = {
         }
     ]
 }
+
+
+@pytest.mark.parametrize(
+    ("model_data", "expected"),
+    [
+        (
+            {
+                "id": "gpt-5.6-sol",
+                "supported_endpoints": ["/responses", "ws:/responses"],
+            },
+            True,
+        ),
+        (
+            {
+                "id": "gpt-5.4",
+                "supported_endpoints": ["/responses", "/chat/completions"],
+            },
+            True,
+        ),
+        (
+            {
+                "id": "dual-endpoint-model",
+                "supported_endpoints": ["/chat/completions", "/responses"],
+            },
+            False,
+        ),
+        (
+            {
+                "id": "responses-v1-model",
+                "supported_endpoints": ["/v1/responses"],
+            },
+            True,
+        ),
+        (
+            {
+                "id": "gpt-5.4",
+                "supported_endpoints": ["/chat/completions"],
+            },
+            False,
+        ),
+        ({"id": "gpt-5.4"}, True),
+        ({"id": "gpt-5.3-codex"}, True),
+        ({"id": "gpt-4.1"}, False),
+    ],
+)
+def test_uses_responses_api(model_data, expected):
+    assert _uses_responses_api(model_data) is expected
+
+
+def test_register_models_selects_supported_endpoint():
+    models_data = {
+        "data": [
+            {
+                "id": "gpt-5.6-sol",
+                "supported_endpoints": ["/responses"],
+                "capabilities": {"supports": {"streaming": True}},
+            },
+            {
+                "id": "gpt-4.1",
+                "supported_endpoints": ["/chat/completions"],
+                "capabilities": {"supports": {"streaming": True}},
+            },
+        ]
+    }
+    registered = []
+
+    with (
+        patch(
+            "llm_github_copilot.GitHubCopilotAuthenticator.has_valid_credentials",
+            return_value=True,
+        ),
+        patch(
+            "llm_github_copilot.GitHubCopilotAuthenticator.get_api_key",
+            return_value=GITHUB_COPILOT_TOKEN,
+        ),
+        patch(
+            "llm_github_copilot.fetch_models_data",
+            return_value=models_data,
+        ),
+    ):
+        llm_github_copilot.register_models(
+            lambda model, async_model: registered.append((model, async_model))
+        )
+
+    assert isinstance(registered[0][0], GitHubCopilotResponses)
+    assert isinstance(registered[0][1], GitHubCopilotAsyncResponses)
+    assert isinstance(registered[1][0], GitHubCopilotChat)
+    assert isinstance(registered[1][1], GitHubCopilotAsyncChat)
+
 
 @pytest.mark.vcr
 def test_prompt():

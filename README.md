@@ -131,6 +131,10 @@ llm -m github_copilot/model-name "Write a Python function that calculates the Fi
 llm -m github_copilot/model-name "Tell me a joke" -o max_tokens 100
 ```
 
+The plugin selects the API endpoint advertised for each model by GitHub
+Copilot. Models such as GPT-5.4 and GPT-5.6 use the Responses API, while
+models that advertise Chat Completions continue to use that endpoint.
+
 ## Options
 
 The GitHub Copilot plugin supports the following options:

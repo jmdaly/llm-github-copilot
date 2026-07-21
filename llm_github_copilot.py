@@ -10,6 +10,16 @@ from typing import Optional, Any
 import click
 
 
+try:
+    OpenAIResponses = llm.default_plugins.openai_models.Responses
+    OpenAIAsyncResponses = llm.default_plugins.openai_models.AsyncResponses
+except AttributeError as exc:
+    raise ImportError(
+        "llm-github-copilot requires llm>=0.32a3 for Responses API support. "
+        "Reinstall or upgrade llm-github-copilot to refresh its dependencies."
+    ) from exc
+
+
 def _fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
     """
     Helper function to fetch raw model data from the GitHub Copilot API.
@@ -67,6 +77,26 @@ def fetch_models_data(authenticator: "GitHubCopilotAuthenticator") -> dict:
     return _models_data_cache
 
 
+def _uses_responses_api(model_data: dict[str, Any]) -> bool:
+    """Return whether a model should use the OpenAI Responses API."""
+    supported_endpoints = model_data.get("supported_endpoints")
+    if isinstance(supported_endpoints, list) and supported_endpoints:
+        for endpoint in supported_endpoints:
+            if not isinstance(endpoint, str):
+                continue
+            normalized = endpoint.lower().rstrip("/")
+            if normalized in {"/responses", "/v1/responses"}:
+                return True
+            if normalized in {"/chat/completions", "/v1/chat/completions"}:
+                return False
+        return False
+
+    # Older catalog responses omit supported_endpoints. Keep newly introduced
+    # Responses-only families usable until that metadata reaches every account.
+    model_id = str(model_data.get("id", "")).lower()
+    return model_id.startswith(("gpt-5", "codex-", "mai-")) or "-codex" in model_id
+
+
 @llm.hookimpl
 def register_models(register):
     """Register all GitHub Copilot models with the LLM CLI tool."""
@@ -82,10 +112,16 @@ def register_models(register):
             # Register all model variants
             for model_data in models_data.get("data", []):
                 model_id = f"github_copilot/{model_data.get('id')}"
+                if _uses_responses_api(model_data):
+                    model_class = GitHubCopilotResponses
+                    async_model_class = GitHubCopilotAsyncResponses
+                else:
+                    model_class = GitHubCopilotChat
+                    async_model_class = GitHubCopilotAsyncChat
 
                 register(
-                    GitHubCopilotChat(model_id, model_data),
-                    GitHubCopilotAsyncChat(model_id, model_data),
+                    model_class(model_id, model_data),
+                    async_model_class(model_id, model_data),
                 )
     except Exception as e:
         print(f"Warning: Failed to fetch GitHub Copilot models: {str(e)}")
@@ -513,6 +549,16 @@ class GitHubCopilotChat(_GitHubCopilot, llm.default_plugins.openai_models.Chat):
 
 class GitHubCopilotAsyncChat(_GitHubCopilot, llm.default_plugins.openai_models.AsyncChat):
     pass
+
+
+class GitHubCopilotResponses(_GitHubCopilot, OpenAIResponses):
+    def __str__(self):
+        return "GitHub Copilot Responses: {}".format(self.model_id)
+
+
+class GitHubCopilotAsyncResponses(_GitHubCopilot, OpenAIAsyncResponses):
+    def __str__(self):
+        return "GitHub Copilot Responses: {}".format(self.model_id)
 
 
 # LLM CLI command implementation
